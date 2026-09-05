@@ -39,6 +39,8 @@ jobs:
           globs: "**/*.md"
       - name: Check image publication evidence policy
         run: python3 scripts/test-image-publication.py
+      - name: Check macOS test installer safety policy
+        run: python3 scripts/test-macos-test-setup.py
       - name: Lint host and acceptance scripts
         run: shellcheck scripts/*.sh
       - name: Verify the systemd server unit

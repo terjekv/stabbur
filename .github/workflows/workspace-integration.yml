@@ -80,6 +80,14 @@ jobs:
         run: sh scripts/e2e-prepare-munki.sh
         env:
           STABBUR_DISPOSABLE_MACOS: "1"
+      - name: Exercise the complete per-user macOS test installer
+        if: runner.os == 'macOS'
+        working-directory: stabbur
+        timeout-minutes: 10
+        run: |
+          python3 scripts/test-macos-test-setup.py --live \
+            --cli target/debug/stabbur --frontend target/debug/stabbur-frontend \
+            --autopkg /Library/AutoPkg/autopkg
       - name: Prepare isolated headless browser tooling
         if: runner.os == 'macOS'
         working-directory: stabbur

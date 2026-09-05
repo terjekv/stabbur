@@ -67,6 +67,11 @@ Munki export. The supported client, CLI and console pin the same 75-operation pu
 
 ## Quick start
 
+For a complete persistent macOS test setup, including the worker, CLI and management UI, run
+`python3 scripts/install-test-macos.py install`. See the
+[macOS test installer guide](docs/operations/macos-test-setup.md) for prerequisites, configurable
+directories, optional AutoPkg installation and start/stop commands.
+
 ```bash
 cargo build --release --locked
 install -d -m 0700 /var/lib/stabbur
