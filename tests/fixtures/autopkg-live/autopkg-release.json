@@ -1,0 +1,38 @@
+{
+  "sources": [
+    {
+      "url": "https://github.com/autopkg/recipes.git",
+      "commit": "6c092b47e9c6324aa48758832b2597a0f3ff932e"
+    }
+  ],
+  "entrypoint": "com.github.autopkg.download.AutoPkg-Release",
+  "inputs": {},
+  "required_capabilities": [],
+  "output": {
+    "version_pointer": "/stabbur/receipts/0/1/Output/version",
+    "recipe_trust_pointer": "/stabbur/recipe_trust_succeeded",
+    "variants": [
+      {
+        "platform": "mac_os",
+        "architecture": "universal",
+        "minimum_macos": "13.0",
+        "maximum_macos": null,
+        "resolution_priority": 0,
+        "artifacts": [
+          {
+            "path_pointer": "/stabbur/receipts/0/2/Output/pathname",
+            "media_type": "application/vnd.apple.installer+xml",
+            "role": "primary_installer"
+          }
+        ]
+      }
+    ],
+    "verification": [
+      {
+        "name": "recipe_trust",
+        "pointer": "/stabbur/recipe_trust_succeeded",
+        "required": true
+      }
+    ]
+  }
+}

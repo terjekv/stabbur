@@ -1,0 +1,20 @@
+[package]
+name = "stabbur-store-core"
+description = "Streaming artifact-store port for Stabbur"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+futures-core.workspace = true
+serde.workspace = true
+stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
+thiserror.workspace = true
+
+[lints]
+workspace = true

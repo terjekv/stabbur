@@ -1,0 +1,110 @@
+name: Cross-repository development integration
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      client_ref:
+        description: Client commit or branch for coordinated review
+        default: main
+      cli_ref:
+        description: CLI commit or branch for coordinated review
+        default: main
+      frontend_ref:
+        description: Console commit or branch for coordinated review
+        default: main
+permissions:
+  contents: read
+concurrency:
+  group: workspace-integration-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+jobs:
+  workflow:
+    name: Single-host integration (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: stabbur
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: stabbur-dev/stabbur-client-rust
+          ref: ${{ inputs.client_ref || 'main' }}
+          path: stabbur-client-rust
+          persist-credentials: false
+          token: ${{ secrets.STABBUR_REPOSITORIES_READ_TOKEN || github.token }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: stabbur-dev/stabbur-cli
+          ref: ${{ inputs.cli_ref || 'main' }}
+          path: stabbur-cli
+          persist-credentials: false
+          token: ${{ secrets.STABBUR_REPOSITORIES_READ_TOKEN || github.token }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: stabbur-dev/stabbur-frontend
+          ref: ${{ inputs.frontend_ref || 'main' }}
+          path: stabbur-frontend
+          persist-credentials: false
+          token: ${{ secrets.STABBUR_REPOSITORIES_READ_TOKEN || github.token }}
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
+        with:
+          toolchain: stable
+      - name: Record exact checked revisions (development evidence only)
+        run: |
+          git -C stabbur rev-parse HEAD
+          git -C stabbur-client-rust rev-parse HEAD
+          git -C stabbur-cli rev-parse HEAD
+          git -C stabbur-frontend rev-parse HEAD
+      - name: Exercise supported operator workflow
+        working-directory: stabbur
+        run: python3 scripts/check-workspace-integration.py --target target
+      - name: Prepare pinned AutoPkg on the disposable Mac
+        if: runner.os == 'macOS'
+        working-directory: stabbur
+        timeout-minutes: 10
+        run: scripts/live-worker-prepare-autopkg.sh
+        env:
+          STABBUR_DISPOSABLE_MACOS: "1"
+      - name: Prepare pinned Munki CLI tools on the disposable Mac
+        if: runner.os == 'macOS'
+        working-directory: stabbur
+        timeout-minutes: 10
+        run: sh scripts/e2e-prepare-munki.sh
+        env:
+          STABBUR_DISPOSABLE_MACOS: "1"
+      - name: Prepare isolated headless browser tooling
+        if: runner.os == 'macOS'
+        working-directory: stabbur
+        run: |
+          python3 -m venv "$RUNNER_TEMP/stabbur-browser"
+          "$RUNNER_TEMP/stabbur-browser/bin/python" -m pip install -r scripts/requirements-e2e.txt
+          "$RUNNER_TEMP/stabbur-browser/bin/python" -m playwright install chromium
+      - name: Exercise real delivery, browser management and recovery on one Mac
+        if: runner.os == 'macOS'
+        working-directory: stabbur
+        timeout-minutes: 15
+        run: |
+          "$RUNNER_TEMP/stabbur-browser/bin/python" scripts/e2e-single-host.py \
+            --cli target/debug/stabbur --frontend target/debug/stabbur-frontend \
+            --browser --install-fixture --evidence target/single-host-evidence.json
+        env:
+          STABBUR_DISPOSABLE_MACOS: "1"
+      - name: Upload credential-free acceptance evidence
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos-single-host-evidence
+          path: stabbur/target/single-host-evidence.json
+          if-no-files-found: warn
+          retention-days: 14

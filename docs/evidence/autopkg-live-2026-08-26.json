@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-26T03:41:35Z",
+  "command": "scripts/live-autopkg-acceptance.sh tests/fixtures/autopkg-live/autopkg-release.json EVIDENCE_JSON",
+  "environment": {
+    "server": "stabbur-server 0.1.0",
+    "operating_system": "macos/26.6.1",
+    "autopkg": "2.9.0",
+    "xcode": "Xcode 26.6 (17F113)"
+  },
+  "autopkg_runtime": {
+    "asset_url": "https://github.com/autopkg/autopkg/releases/download/v2.9.0/autopkg-2.9.0.pkg",
+    "asset_sha256": "b858161c4fe20429127a0429cdf1e6e1e2cca66b1b5ec2f81a2b98933b0a66f2",
+    "package_signature": "unsigned",
+    "use": "SHA-256-verified temporary payload extraction; no system installation or launch daemon"
+  },
+  "fixture": {
+    "source_url": "https://github.com/autopkg/recipes.git",
+    "source_commit": "6c092b47e9c6324aa48758832b2597a0f3ff932e",
+    "entrypoint": "com.github.autopkg.download.AutoPkg-Release"
+  },
+  "result": {
+    "run_id": "01a03c28-8ccd-74c1-a0c8-a7cd3373e94d",
+    "state": "succeeded",
+    "discovered_version": "2.9.0",
+    "release_id": "01a03c28-9b28-78b1-93a4-ef98965c0a31",
+    "release_state": "candidate",
+    "candidate_release_id": "01a03c28-9b28-78b1-93a4-ef98965c0a31",
+    "artifact": {
+      "digest": "b858161c4fe20429127a0429cdf1e6e1e2cca66b1b5ec2f81a2b98933b0a66f2",
+      "size": 52253994,
+      "media_type": "application/vnd.apple.installer+xml",
+      "role": "primary_installer"
+    },
+    "location": {
+      "state": "present",
+      "verified_at": "2026-08-26T03:41:29.247656Z"
+    },
+    "verification": [
+      {
+        "check": "recipe_trust",
+        "required": true,
+        "succeeded": true
+      }
+    ]
+  },
+  "audit": {
+    "full_source_commit_materialized": true,
+    "autopkg_invoked_without_a_shell": true,
+    "processor_receipt_captured": true,
+    "server_rehashed_upload": true,
+    "verified_primary_location_present": true,
+    "candidate_bound_to_release": true,
+    "private_worker_paths_found_in_retained_report": false,
+    "private_worker_paths_found_in_retained_logs": false,
+    "credential_fields_found_in_evidence": false
+  }
+}

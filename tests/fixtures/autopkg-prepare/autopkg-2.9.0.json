@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "release": {
+    "tag": "v2.9.0",
+    "page": "https://github.com/autopkg/autopkg/releases/tag/v2.9.0",
+    "url": "https://github.com/autopkg/autopkg/releases/download/v2.9.0/autopkg-2.9.0.pkg",
+    "size": 52253994,
+    "sha256": "b858161c4fe20429127a0429cdf1e6e1e2cca66b1b5ec2f81a2b98933b0a66f2"
+  },
+  "expected_manifest_sha256": "7d829c7c6a60c5f39feff17dced34f8ed3de472e9a61e6ee0d38c076a8e7a847",
+  "manifest": {
+    "schema_version": 1,
+    "builder": "autopkg",
+    "version": "2.9.0",
+    "package": {
+      "path": "/private/tmp/stabbur-autopkg-2.9.0.pkg",
+      "sha256": "b858161c4fe20429127a0429cdf1e6e1e2cca66b1b5ec2f81a2b98933b0a66f2",
+      "identifier": "com.github.autopkg.autopkg",
+      "signature": {
+        "policy": "unsigned"
+      }
+    },
+    "health_check": {
+      "program": "/Library/AutoPkg/autopkg",
+      "arguments": ["version"],
+      "expected_output": "2.9.0"
+    }
+  }
+}

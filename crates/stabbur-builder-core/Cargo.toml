@@ -1,0 +1,21 @@
+[package]
+name = "stabbur-builder-core"
+description = "Builder-neutral request, result, verification, and provenance contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+chrono.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
+stabbur-jobs-core = { version = "0.1.0", path = "../stabbur-jobs-core" }
+thiserror.workspace = true
+
+[lints]
+workspace = true

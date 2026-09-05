@@ -1,0 +1,26 @@
+[package]
+name = "stabbur-builder-autopkg"
+description = "Isolated macOS AutoPkg builder adapter for Stabbur"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+plist.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stabbur-builder-core = { version = "0.1.0", path = "../stabbur-builder-core" }
+stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
+stabbur-jobs-core = { version = "0.1.0", path = "../stabbur-jobs-core" }
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+yaml_serde.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,18 @@
+[package]
+name = "stabbur-jobs-core"
+description = "Builder-neutral persistent job and lease policy for Stabbur"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
+thiserror.workspace = true
+
+[lints]
+workspace = true

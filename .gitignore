@@ -1,0 +1,9 @@
+/target
+/.env
+/.stabbur
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+__pycache__/
+*.py[cod]

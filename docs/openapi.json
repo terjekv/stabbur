@@ -1,0 +1,6553 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Stabbur API",
+    "description": "Software artifact control plane and outbound worker coordination API",
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/artifacts/{digest}": {
+      "get": {
+        "tags": [
+          "artifacts"
+        ],
+        "operationId": "get_artifact",
+        "parameters": [
+          {
+            "name": "digest",
+            "in": "path",
+            "description": "Lowercase SHA-256 digest",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/artifacts/{digest}/content": {
+      "get": {
+        "tags": [
+          "artifacts"
+        ],
+        "operationId": "download_artifact_content",
+        "parameters": [
+          {
+            "name": "digest",
+            "in": "path",
+            "description": "Lowercase SHA-256 digest",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "description": "One closed, open-ended, or suffix byte range",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "Strong digest ETag",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete immutable artifact content",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "206": {
+            "description": "Single byte range",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "304": {
+            "description": "Digest ETag matched"
+          },
+          "416": {
+            "description": "Invalid, unsatisfiable, or multiple ranges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "artifacts"
+        ],
+        "operationId": "upload_artifact_content",
+        "parameters": [
+          {
+            "name": "digest",
+            "in": "path",
+            "description": "Declared lowercase SHA-256 digest",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Existing verified content reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadArtifactResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Content verified and published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadArtifactResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Digest or size mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "head": {
+        "tags": [
+          "artifacts"
+        ],
+        "operationId": "head_artifact_content",
+        "parameters": [
+          {
+            "name": "digest",
+            "in": "path",
+            "description": "Lowercase SHA-256 digest",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "description": "One closed, open-ended, or suffix byte range",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "Strong digest ETag",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete immutable artifact metadata"
+          },
+          "206": {
+            "description": "Single byte-range metadata"
+          },
+          "304": {
+            "description": "Digest ETag matched"
+          },
+          "416": {
+            "description": "Invalid, unsatisfiable, or multiple ranges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/artifacts/{digest}/locations": {
+      "get": {
+        "tags": [
+          "artifacts"
+        ],
+        "operationId": "list_artifact_locations",
+        "parameters": [
+          {
+            "name": "digest",
+            "in": "path",
+            "description": "Lowercase SHA-256 digest",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact locations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactLocationList"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "operationId": "list_audit_events",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Append-only audit page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cursor or limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Audit permission required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/bootstrap": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "bootstrap",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "First administrator created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Bootstrap unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Short-lived CLI session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "Authenticated principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed and sessions revoked"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/principals": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "list_principals",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Principal page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "create_principal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePrincipalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Human or service principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalAdminResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/principals/{principal}": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "get_principal",
+        "parameters": [
+          {
+            "name": "principal",
+            "in": "path",
+            "description": "Principal UUIDv7 or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalAdminResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "update_principal",
+        "parameters": [
+          {
+            "name": "principal",
+            "in": "path",
+            "description": "Principal UUIDv7 or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Current ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePrincipalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalAdminResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/principals/{principal}/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "reset_principal_password",
+        "parameters": [
+          {
+            "name": "principal",
+            "in": "path",
+            "description": "Human UUIDv7 or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password reset and credentials revoked"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/principals/{principal}/revoke-sessions": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "revoke_principal_sessions",
+        "parameters": [
+          {
+            "name": "principal",
+            "in": "path",
+            "description": "Human UUIDv7 or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential revocation count"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/principals/{principal}/tokens": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "list_api_tokens",
+        "parameters": [
+          {
+            "name": "principal",
+            "in": "path",
+            "description": "Principal UUIDv7 or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Named API tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiTokenList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "create_api_token",
+        "parameters": [
+          {
+            "name": "principal",
+            "in": "path",
+            "description": "Principal UUIDv7 or name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "One-time named API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedApiTokenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/roles": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "list_roles",
+        "responses": {
+          "200": {
+            "description": "Role policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "create_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Custom role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/tokens/{token}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "revoke_api_token",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "API token UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked token metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiTokenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/build-targets": {
+      "get": {
+        "tags": [
+          "build-targets"
+        ],
+        "operationId": "list_build_targets",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Build target page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTargetPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "build-targets"
+        ],
+        "operationId": "create_build_target",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBuildTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Build target created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTargetResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Software or recipe revision not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Target name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/build-targets/{target}": {
+      "get": {
+        "tags": [
+          "build-targets"
+        ],
+        "operationId": "get_build_target",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "description": "Build target UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Build target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTargetResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Build target not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "build-targets"
+        ],
+        "operationId": "update_build_target",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "description": "Build target UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Current target ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBuildTargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated build target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTargetResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale target revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/build-targets/{target}/runs": {
+      "get": {
+        "tags": [
+          "build-targets"
+        ],
+        "operationId": "list_build_target_runs",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "description": "Build target UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runs created from this target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Build target not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "build-targets"
+        ],
+        "operationId": "trigger_build_target",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "description": "Build target UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable manual trigger identity",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prior manual trigger replayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Target run and job queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Target is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "operationId": "list_jobs",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable job page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{job}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "operationId": "get_job",
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "description": "Job UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "openapi_document",
+        "responses": {
+          "200": {
+            "description": "Released OpenAPI contract"
+          }
+        }
+      }
+    },
+    "/api/v1/operations/status": {
+      "get": {
+        "tags": [
+          "operations"
+        ],
+        "operationId": "operational_status",
+        "responses": {
+          "200": {
+            "description": "Operational measurements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipe-catalog-entries": {
+      "get": {
+        "tags": [
+          "recipe-catalogs"
+        ],
+        "operationId": "resolve_recipe_catalog_entry",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "description": "Exact builder-owned recipe identifier or entrypoint.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact latest-source recipe catalog lookup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogLookupResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipe-catalog-scans": {
+      "get": {
+        "tags": [
+          "recipe-catalogs"
+        ],
+        "operationId": "list_recipe_catalog_scans",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable catalog scan page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogScanPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "recipe-catalogs"
+        ],
+        "operationId": "create_recipe_catalog_scan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecipeCatalogScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotently replayed catalog scan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogScanResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Catalog scan queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogScanResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipe-catalog-scans/{scan}": {
+      "get": {
+        "tags": [
+          "recipe-catalogs"
+        ],
+        "operationId": "get_recipe_catalog_scan",
+        "parameters": [
+          {
+            "name": "scan",
+            "in": "path",
+            "description": "Catalog scan UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable catalog scan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogScanResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Catalog scan not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipe-catalog-scans/{scan}/cancel": {
+      "post": {
+        "tags": [
+          "recipe-catalogs"
+        ],
+        "operationId": "cancel_recipe_catalog_scan",
+        "parameters": [
+          {
+            "name": "scan",
+            "in": "path",
+            "description": "Catalog scan UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled catalog scan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogScanResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Catalog scan not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipe-catalogs": {
+      "get": {
+        "tags": [
+          "recipe-catalogs"
+        ],
+        "operationId": "list_recipe_catalog_snapshots",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable recipe catalog snapshot page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogSnapshotPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipe-catalogs/{snapshot}": {
+      "get": {
+        "tags": [
+          "recipe-catalogs"
+        ],
+        "operationId": "get_recipe_catalog_snapshot",
+        "parameters": [
+          {
+            "name": "snapshot",
+            "in": "path",
+            "description": "Catalog snapshot UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable recipe catalog snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeCatalogSnapshotResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Catalog snapshot not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipes": {
+      "get": {
+        "tags": [
+          "recipes"
+        ],
+        "operationId": "list_recipes",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipePage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "recipes"
+        ],
+        "operationId": "create_recipe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecipeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Recipe created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipes/{recipe}": {
+      "get": {
+        "tags": [
+          "recipes"
+        ],
+        "operationId": "get_recipe",
+        "parameters": [
+          {
+            "name": "recipe",
+            "in": "path",
+            "description": "Recipe UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipes/{recipe}/revisions": {
+      "get": {
+        "tags": [
+          "recipes"
+        ],
+        "operationId": "list_recipe_revisions",
+        "parameters": [
+          {
+            "name": "recipe",
+            "in": "path",
+            "description": "Recipe UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable recipe revisions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeRevisionList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "recipes"
+        ],
+        "operationId": "create_recipe_revision",
+        "parameters": [
+          {
+            "name": "recipe",
+            "in": "path",
+            "description": "Recipe UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecipeRevisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Immutable validated builder revision created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeRevisionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipe not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/recipes/{recipe}/runs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "list_recipe_runs",
+        "parameters": [
+          {
+            "name": "recipe",
+            "in": "path",
+            "description": "Recipe UUIDv7 or exact name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recipe run page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/releases/{release}": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "get_release",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "path",
+            "description": "Release UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/releases/{release}/reject": {
+      "post": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "reject_release",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "path",
+            "description": "Release UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Current release ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectReleaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Release rejected and channels removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/releases/{release}/variants": {
+      "get": {
+        "tags": [
+          "variants"
+        ],
+        "operationId": "list_release_variants",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "path",
+            "description": "Release UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release variants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantList"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/releases/{release}/withdraw": {
+      "post": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "withdraw_release",
+        "parameters": [
+          {
+            "name": "release",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectReleaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Release withdrawn; lifecycle and bytes preserved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already withdrawn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "list_runs",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "create_run",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable retry identity",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Prior idempotent run creation replayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Run and compatible job queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Software or revision not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{run}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "get_run",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "path",
+            "description": "Run UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{run}/cancel": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "cancel_run",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "path",
+            "description": "Run UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Stable retry identity",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run cancelled and active lease invalidated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run is already terminal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{run}/events": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "stream_run_events",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "path",
+            "description": "Run UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque exclusive log cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "Numeric last delivered log sequence",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replay followed by live run events",
+            "content": {
+              "text/event-stream": {}
+            }
+          },
+          "404": {
+            "description": "Run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{run}/logs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "list_run_logs",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "path",
+            "description": "Run UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque exclusive sequence cursor.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ordered exact-byte run logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunLogPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/software": {
+      "get": {
+        "tags": [
+          "software"
+        ],
+        "operationId": "list_software",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cursor page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwarePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cursor or limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "software"
+        ],
+        "operationId": "create_software",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSoftwareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Software created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwareResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid software",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Slug already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/software/{software}": {
+      "get": {
+        "tags": [
+          "software"
+        ],
+        "operationId": "get_software",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "description": "UUIDv7 identity or lowercase slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Software",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwareResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Software not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "software"
+        ],
+        "operationId": "update_software",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "description": "UUIDv7 identity or lowercase slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Current ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSoftwareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated software",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwareResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale software revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/software/{software}/channels": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "list_channels",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "description": "Software UUIDv7 or slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/software/{software}/channels/{channel}": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "get_channel",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "description": "Software UUIDv7 or slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "Channel name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "promote_channel",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "description": "Software UUIDv7 or slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "path",
+            "description": "`testing` or `stable`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Current ETag or `\"rev-0\"` for creation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteChannelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Channel advanced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Channel created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/software/{software}/releases": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "operationId": "list_releases",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "description": "Software UUIDv7 or slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleasePage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Software not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/software/{software}/resolve": {
+      "get": {
+        "tags": [
+          "resolver"
+        ],
+        "operationId": "resolve_software",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "description": "Software UUIDv7 or slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "description": "Channel name, default `stable`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "description": "Platform: `mac_os`, `linux`, or `windows`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "architecture",
+            "in": "query",
+            "description": "Architecture: `x86_64` or `aarch64`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "macos",
+            "in": "query",
+            "description": "Numeric Apple-style macOS version.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One readable primary installer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No compatible variant or channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ambiguous variant or unavailable artifact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/software/{software}/status": {
+      "get": {
+        "tags": [
+          "software"
+        ],
+        "operationId": "software_status",
+        "parameters": [
+          {
+            "name": "software",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Software execution and publication status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwareStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/stores": {
+      "get": {
+        "tags": [
+          "stores"
+        ],
+        "operationId": "list_stores",
+        "responses": {
+          "200": {
+            "description": "Configured artifact stores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/stores/{store}": {
+      "get": {
+        "tags": [
+          "stores"
+        ],
+        "operationId": "get_store",
+        "parameters": [
+          {
+            "name": "store",
+            "in": "path",
+            "description": "Store UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/stores/{store}/test": {
+      "post": {
+        "tags": [
+          "stores"
+        ],
+        "operationId": "test_store",
+        "parameters": [
+          {
+            "name": "store",
+            "in": "path",
+            "description": "Store UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Non-mutating adapter probe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreTestResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/workers": {
+      "get": {
+        "tags": [
+          "workers"
+        ],
+        "operationId": "list_workers",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Worker page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "workers"
+        ],
+        "operationId": "provision_worker",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionWorkerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "One-time worker credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerCredentialResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Worker name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/workers/{worker}": {
+      "get": {
+        "tags": [
+          "workers"
+        ],
+        "operationId": "get_worker",
+        "parameters": [
+          {
+            "name": "worker",
+            "in": "path",
+            "description": "Worker UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Worker",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "workers"
+        ],
+        "operationId": "update_worker",
+        "parameters": [
+          {
+            "name": "worker",
+            "in": "path",
+            "description": "Worker UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Current ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated worker",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/workers/{worker}/drain": {
+      "post": {
+        "tags": [
+          "workers"
+        ],
+        "operationId": "drain_worker",
+        "parameters": [
+          {
+            "name": "worker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrainWorkerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Worker claim policy updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/workers/{worker}/rotate-token": {
+      "post": {
+        "tags": [
+          "workers"
+        ],
+        "operationId": "rotate_worker_token",
+        "parameters": [
+          {
+            "name": "worker",
+            "in": "path",
+            "description": "Worker UUIDv7",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Current ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One-time rotated credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotatedWorkerCredentialResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "readyz",
+        "responses": {
+          "200": {
+            "description": "Server dependencies are ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required server dependency is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiTokenList": {
+        "type": "object",
+        "description": "API token collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiTokenResponse"
+            },
+            "description": "Named tokens, including revoked metadata."
+          }
+        }
+      },
+      "ApiTokenResponse": {
+        "type": "object",
+        "description": "API token metadata without recoverable secret material.",
+        "required": [
+          "id",
+          "principal_id",
+          "name",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Optional expiration."
+          },
+          "id": {
+            "type": "string",
+            "description": "Token UUIDv7 identity."
+          },
+          "name": {
+            "type": "string",
+            "description": "Required token name."
+          },
+          "principal_id": {
+            "type": "string",
+            "description": "Owning principal identity."
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Revocation time."
+          }
+        }
+      },
+      "ArtifactLocationList": {
+        "type": "object",
+        "description": "Independently tracked artifact locations.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactLocationResponse"
+            },
+            "description": "All known locations for this digest."
+          }
+        }
+      },
+      "ArtifactLocationResponse": {
+        "type": "object",
+        "description": "One artifact location response.",
+        "required": [
+          "id",
+          "store_id",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 location identity."
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Safe adapter error summary, when the location is unhealthy."
+          },
+          "state": {
+            "type": "string",
+            "description": "Durable location state."
+          },
+          "store_id": {
+            "type": "string",
+            "description": "UUIDv7 store identity."
+          },
+          "verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Last server verification time."
+          }
+        }
+      },
+      "ArtifactResponse": {
+        "type": "object",
+        "description": "Immutable artifact metadata response.",
+        "required": [
+          "digest",
+          "size",
+          "media_type",
+          "created_at",
+          "locations"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Ingestion time."
+          },
+          "digest": {
+            "type": "string",
+            "description": "Lowercase SHA-256 digest."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactLocationResponse"
+            },
+            "description": "Independently tracked location states."
+          },
+          "media_type": {
+            "type": "string",
+            "description": "Media type."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Exact byte length.",
+            "minimum": 0
+          }
+        }
+      },
+      "AuditEventResponse": {
+        "type": "object",
+        "description": "Append-only audit event response.",
+        "required": [
+          "id",
+          "actor",
+          "action",
+          "resource_kind",
+          "details",
+          "occurred_at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Stable operation name."
+          },
+          "actor": {
+            "description": "Authenticated, bootstrap, or local break-glass actor."
+          },
+          "details": {
+            "description": "Safe operation details."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 event identity."
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event time."
+          },
+          "request_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Request correlation identity."
+          },
+          "resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional domain resource identity."
+          },
+          "resource_kind": {
+            "type": "string",
+            "description": "Stable resource kind."
+          }
+        }
+      },
+      "AuditPage": {
+        "type": "object",
+        "description": "Cursor-paginated audit collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventResponse"
+            },
+            "description": "Current page of append-only events."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque cursor for the next page."
+          }
+        }
+      },
+      "BlockedTargetResponse": {
+        "type": "object",
+        "description": "Target waiting for one recently observed worker matching all its capabilities.",
+        "required": [
+          "id",
+          "name",
+          "required_capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Target identity."
+          },
+          "name": {
+            "type": "string",
+            "description": "Target name."
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Required capabilities."
+          }
+        }
+      },
+      "BootstrapRequest": {
+        "type": "object",
+        "description": "First-administrator request using the one-time secret file contents.",
+        "required": [
+          "secret",
+          "username",
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "First administrator password."
+          },
+          "secret": {
+            "type": "string",
+            "format": "password",
+            "description": "One-time bootstrap secret."
+          },
+          "username": {
+            "type": "string",
+            "description": "First administrator login name."
+          }
+        }
+      },
+      "BuildTargetPage": {
+        "type": "object",
+        "description": "Cursor page of desired build targets.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildTargetResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "BuildTargetResponse": {
+        "type": "object",
+        "description": "Persisted desired build target.",
+        "required": [
+          "id",
+          "name",
+          "software_id",
+          "recipe_revision_id",
+          "parameters",
+          "schedule",
+          "enabled",
+          "created_at",
+          "updated_at",
+          "revision"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether triggering is allowed."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable UUIDv7 target identity."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique operator-facing name."
+          },
+          "next_run_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Next recurring cursor, absent for manual targets."
+          },
+          "parameters": {
+            "description": "Declared non-secret parameters."
+          },
+          "recipe_revision_id": {
+            "type": "string",
+            "description": "Exact immutable recipe revision identity."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/BuildTargetSchedulePayload",
+            "description": "Manual or recurring trigger policy."
+          },
+          "software_id": {
+            "type": "string",
+            "description": "Bound software identity."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Latest configuration or scheduler-cursor change."
+          }
+        }
+      },
+      "BuildTargetSchedulePayload": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Runs are created only through the explicit trigger endpoint.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "manual"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The server consumes a durable cursor at this fixed interval.",
+            "required": [
+              "every_seconds",
+              "kind"
+            ],
+            "properties": {
+              "every_seconds": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Seconds between eligible cursors.",
+                "maximum": 31536000,
+                "minimum": 60
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "interval"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Manual or fixed-interval target schedule."
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "description": "Self-service password change request.",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "format": "password",
+            "description": "Current password."
+          },
+          "new_password": {
+            "type": "string",
+            "format": "password",
+            "description": "New password."
+          }
+        }
+      },
+      "ChannelList": {
+        "type": "object",
+        "description": "Current channel collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelResponse"
+            },
+            "description": "Current bindings sorted by name."
+          }
+        }
+      },
+      "ChannelResponse": {
+        "type": "object",
+        "description": "Current channel binding.",
+        "required": [
+          "software_id",
+          "name",
+          "release_id",
+          "revision"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Channel name."
+          },
+          "pinned_variant_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional pinned variant."
+          },
+          "release_id": {
+            "type": "string",
+            "description": "Current release target."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          },
+          "software_id": {
+            "type": "string",
+            "description": "Parent software identity."
+          }
+        }
+      },
+      "CreateApiTokenRequest": {
+        "type": "object",
+        "description": "Named long-lived API token request.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Optional expiration."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique operator-facing name within the principal."
+          }
+        }
+      },
+      "CreateBuildTargetRequest": {
+        "type": "object",
+        "description": "Build target creation request.",
+        "required": [
+          "name",
+          "software",
+          "recipe_revision",
+          "schedule"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether triggering is allowed."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique operator-facing target name."
+          },
+          "next_run_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Initial recurring cursor; defaults to creation time for interval targets."
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Declared non-secret builder parameters.",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "recipe_revision": {
+            "type": "string",
+            "description": "Exact immutable recipe revision UUIDv7."
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/BuildTargetSchedulePayload",
+            "description": "Manual or recurring policy."
+          },
+          "software": {
+            "type": "string",
+            "description": "Software UUIDv7 or slug."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatePrincipalRequest": {
+        "type": "object",
+        "description": "Human or service principal creation request.",
+        "required": [
+          "name",
+          "kind",
+          "roles"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "`human` or `service`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique login or service name."
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "password",
+            "description": "Initial human password; forbidden for services."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "One or more existing roles."
+          }
+        }
+      },
+      "CreateRecipeCatalogScanRequest": {
+        "type": "object",
+        "description": "Creates one server-requested worker scan.",
+        "required": [
+          "producer",
+          "source"
+        ],
+        "properties": {
+          "producer": {
+            "type": "string",
+            "description": "Stable producer adapter. v0.1 supports `autopkg`."
+          },
+          "source": {
+            "$ref": "#/components/schemas/RecipeCatalogScanSourceRequest",
+            "description": "Exact immutable source to inspect."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateRecipeRequest": {
+        "type": "object",
+        "description": "Recipe metadata creation request.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique operator-facing recipe name."
+          }
+        }
+      },
+      "CreateRecipeRevisionRequest": {
+        "type": "object",
+        "description": "Immutable builder-neutral recipe revision request.",
+        "required": [
+          "builder",
+          "definition"
+        ],
+        "properties": {
+          "builder": {
+            "type": "string",
+            "description": "Stable server-supported builder adapter name."
+          },
+          "definition": {
+            "type": "object",
+            "description": "Adapter-owned immutable definition. The server validates this for the selected builder."
+          },
+          "expected_sequence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Optional next sequence; a stale plan fails atomically before append.",
+            "minimum": 1
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Additional scheduling constraints beyond those required by the selected builder."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateRoleRequest": {
+        "type": "object",
+        "description": "Custom role request.",
+        "required": [
+          "name",
+          "permissions"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Valid lowercase role name."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "One or more exact permission names."
+          }
+        }
+      },
+      "CreateRunRequest": {
+        "type": "object",
+        "description": "Queued run creation request.",
+        "required": [
+          "software",
+          "recipe_revision"
+        ],
+        "properties": {
+          "parameters": {
+            "type": "object",
+            "description": "Declared non-secret builder parameters.",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "recipe_revision": {
+            "type": "string",
+            "description": "Immutable recipe revision UUIDv7."
+          },
+          "software": {
+            "type": "string",
+            "description": "Software UUIDv7 or slug."
+          }
+        }
+      },
+      "CreateSoftwareRequest": {
+        "type": "object",
+        "description": "Software creation request.",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "properties": {
+          "installation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstallationMetadata",
+                "description": "Optional declarative installation and detection metadata."
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "Unique lowercase URL slug."
+          }
+        }
+      },
+      "CreatedApiTokenResponse": {
+        "type": "object",
+        "description": "One-time API token response.",
+        "required": [
+          "token",
+          "secret"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string",
+            "format": "password",
+            "description": "Raw bearer secret returned exactly once."
+          },
+          "token": {
+            "$ref": "#/components/schemas/ApiTokenResponse",
+            "description": "Token metadata."
+          }
+        }
+      },
+      "DrainWorkerRequest": {
+        "type": "object",
+        "description": "Change whether a worker may claim new work while preserving active leases.",
+        "required": [
+          "draining"
+        ],
+        "properties": {
+          "draining": {
+            "type": "boolean",
+            "description": "True pauses new claims; false resumes claims."
+          }
+        },
+        "additionalProperties": false
+      },
+      "InstallationMetadata": {
+        "type": "object",
+        "description": "Declarative, platform-neutral installation and detection metadata.",
+        "required": [
+          "install",
+          "detection"
+        ],
+        "properties": {
+          "detection": {
+            "description": "Installed-state detection metadata interpreted by a client or packager."
+          },
+          "install": {
+            "description": "Installation metadata interpreted by a client or packager."
+          }
+        }
+      },
+      "JobPage": {
+        "type": "object",
+        "description": "Cursor page of durable jobs.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummaryResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "JobResponse": {
+        "type": "object",
+        "description": "Durable builder-neutral job response.",
+        "required": [
+          "id",
+          "required_capabilities",
+          "payload",
+          "state",
+          "maximum_attempts",
+          "attempt_count",
+          "created_at"
+        ],
+        "properties": {
+          "attempt_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Attempts already issued.",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 job identity."
+          },
+          "maximum_attempts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximum permitted attempts.",
+            "minimum": 0
+          },
+          "payload": {
+            "description": "Builder-neutral request envelope."
+          },
+          "recipe_catalog_scan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Owning recipe catalog scan identity, absent for build work."
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Required worker capability names."
+          },
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Owning build run identity, absent for non-build work."
+          },
+          "state": {
+            "type": "string",
+            "description": "Durable scheduling state."
+          }
+        }
+      },
+      "JobSummaryResponse": {
+        "type": "object",
+        "description": "Lightweight job representation used by bounded collection responses.",
+        "required": [
+          "id",
+          "required_capabilities",
+          "state",
+          "maximum_attempts",
+          "attempt_count",
+          "created_at"
+        ],
+        "properties": {
+          "attempt_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Attempts already issued.",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 job identity."
+          },
+          "maximum_attempts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximum permitted attempts.",
+            "minimum": 0
+          },
+          "recipe_catalog_scan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Owning recipe catalog scan identity, absent for build work."
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Required worker capability names."
+          },
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Owning build run identity, absent for non-build work."
+          },
+          "state": {
+            "type": "string",
+            "description": "Durable scheduling state."
+          }
+        }
+      },
+      "LivenessResponse": {
+        "type": "object",
+        "description": "Liveness response.",
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "Local human login request.",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "Human password."
+          },
+          "username": {
+            "type": "string",
+            "description": "Human login name."
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "description": "Short-lived CLI session token.",
+        "required": [
+          "token",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Session expiration."
+          },
+          "token": {
+            "type": "string",
+            "format": "password",
+            "description": "Raw bearer token, returned exactly once."
+          }
+        }
+      },
+      "OperationalStatusResponse": {
+        "type": "object",
+        "description": "Durable queue and worker measurements; contains no backend paths or credentials.",
+        "required": [
+          "queued_jobs",
+          "running_jobs",
+          "failed_jobs",
+          "expired_attempts",
+          "draining_workers"
+        ],
+        "properties": {
+          "draining_workers": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Enabled workers paused for maintenance.",
+            "minimum": 0
+          },
+          "expired_attempts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Historical expired attempts.",
+            "minimum": 0
+          },
+          "failed_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Historical terminal job failures.",
+            "minimum": 0
+          },
+          "oldest_queued_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Creation time of the oldest queued job."
+          },
+          "queued_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Jobs awaiting a worker.",
+            "minimum": 0
+          },
+          "running_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Jobs with a leased attempt.",
+            "minimum": 0
+          }
+        }
+      },
+      "PrincipalAdminResponse": {
+        "type": "object",
+        "description": "Administrative principal representation.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "roles",
+          "enabled",
+          "created_at",
+          "revision"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether authentication is enabled."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 principal identity."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`human`, `service`, or `worker`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique login or service name."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Assigned roles."
+          }
+        }
+      },
+      "PrincipalPage": {
+        "type": "object",
+        "description": "Cursor page of administrative principals.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrincipalAdminResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "PrincipalResponse": {
+        "type": "object",
+        "description": "Safe authenticated principal representation.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "roles"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 identity."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`human`, `service`, or `worker`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Login or service name."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Assigned role names."
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "description": "Stable `application/problem+json` response body.",
+        "required": [
+          "code",
+          "status",
+          "detail",
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable Stabbur code."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable detail safe for untrusted clients."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Request correlation identity."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status.",
+            "minimum": 0
+          },
+          "validation_errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "description": "Field-level validation failures."
+          }
+        }
+      },
+      "PromoteChannelRequest": {
+        "type": "object",
+        "description": "Explicit channel promotion request.",
+        "required": [
+          "release_id"
+        ],
+        "properties": {
+          "pinned_variant_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional variant UUIDv7 pin."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional safe operator reason."
+          },
+          "release_id": {
+            "type": "string",
+            "description": "Release UUIDv7 target."
+          }
+        }
+      },
+      "ProvisionWorkerRequest": {
+        "type": "object",
+        "description": "Administrative worker provisioning request.",
+        "required": [
+          "name",
+          "allowed_capabilities"
+        ],
+        "properties": {
+          "allowed_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Maximum capabilities this worker may advertise."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique operator-facing worker name."
+          }
+        }
+      },
+      "ReadinessResponse": {
+        "type": "object",
+        "description": "Dependency readiness response.",
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "RecipeCatalogDiagnosticResponse": {
+        "type": "object",
+        "description": "Safe catalog validation diagnostic without worker-local paths.",
+        "required": [
+          "code",
+          "severity",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable code."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Bounded operator-facing detail."
+          },
+          "identifier": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Recipe identifier when the diagnostic belongs to one entry."
+          },
+          "severity": {
+            "$ref": "#/components/schemas/RecipeCatalogDiagnosticSeverityResponse",
+            "description": "Diagnostic severity."
+          }
+        }
+      },
+      "RecipeCatalogDiagnosticSeverityResponse": {
+        "type": "string",
+        "description": "Severity of one safe catalog diagnostic.",
+        "enum": [
+          "info",
+          "warning",
+          "error"
+        ]
+      },
+      "RecipeCatalogEntryResponse": {
+        "type": "object",
+        "description": "Builder-neutral recipe observed in a pinned catalog.",
+        "required": [
+          "identifier",
+          "builder",
+          "parents",
+          "required_capabilities"
+        ],
+        "properties": {
+          "builder": {
+            "type": "string",
+            "description": "Stable builder adapter selector."
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Builder-owned stable identifier or entrypoint."
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Normalized parent identifiers."
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Capabilities required to execute this recipe."
+          }
+        }
+      },
+      "RecipeCatalogLookupResponse": {
+        "type": "object",
+        "description": "Exact catalog lookup result across latest source snapshots.",
+        "required": [
+          "identifier",
+          "exists",
+          "matches"
+        ],
+        "properties": {
+          "exists": {
+            "type": "boolean",
+            "description": "Whether any latest source snapshot contains the identifier."
+          },
+          "identifier": {
+            "type": "string",
+            "description": "Exact requested identifier."
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeCatalogMatchResponse"
+            },
+            "description": "Matching latest source observations."
+          }
+        }
+      },
+      "RecipeCatalogManifestResponse": {
+        "type": "object",
+        "description": "Complete versioned builder-neutral catalog manifest.",
+        "required": [
+          "schema_version",
+          "producer",
+          "source",
+          "recipes",
+          "diagnostics"
+        ],
+        "properties": {
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeCatalogDiagnosticResponse"
+            },
+            "description": "Sorted safe validation diagnostics."
+          },
+          "producer": {
+            "type": "string",
+            "description": "Stable producer adapter name."
+          },
+          "recipes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeCatalogEntryResponse"
+            },
+            "description": "Sorted normalized recipe entries."
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Catalog protocol schema version.",
+            "minimum": 0
+          },
+          "source": {
+            "$ref": "#/components/schemas/RecipeCatalogSourceResponse",
+            "description": "Pinned source observation."
+          }
+        }
+      },
+      "RecipeCatalogMatchResponse": {
+        "type": "object",
+        "description": "One exact identifier observed in a latest pinned-source snapshot.",
+        "required": [
+          "snapshot_id",
+          "worker_id",
+          "producer",
+          "source",
+          "recipe",
+          "observed_at"
+        ],
+        "properties": {
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server receipt time."
+          },
+          "producer": {
+            "type": "string",
+            "description": "Stable producer adapter name."
+          },
+          "recipe": {
+            "$ref": "#/components/schemas/RecipeCatalogEntryResponse",
+            "description": "Normalized recipe entry."
+          },
+          "snapshot_id": {
+            "type": "string",
+            "description": "Containing snapshot UUIDv7."
+          },
+          "source": {
+            "$ref": "#/components/schemas/RecipeCatalogSourceResponse",
+            "description": "Pinned source observation."
+          },
+          "worker_id": {
+            "type": "string",
+            "description": "Publishing worker UUIDv7."
+          }
+        }
+      },
+      "RecipeCatalogScanFailureResponse": {
+        "type": "object",
+        "description": "Safe typed terminal scan failure.",
+        "required": [
+          "code",
+          "detail",
+          "failed_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable failure code."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Safe operator-facing detail."
+          },
+          "failed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Worker failure time."
+          },
+          "producer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable producer when the worker decoded the request."
+          }
+        }
+      },
+      "RecipeCatalogScanPage": {
+        "type": "object",
+        "description": "Cursor page of durable catalog scans.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeCatalogScanResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "RecipeCatalogScanResponse": {
+        "type": "object",
+        "description": "Durable server-requested catalog scan.",
+        "required": [
+          "id",
+          "job_id",
+          "producer",
+          "source",
+          "state",
+          "requested_at"
+        ],
+        "properties": {
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Terminal completion time."
+          },
+          "failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecipeCatalogScanFailureResponse",
+                "description": "Safe typed worker failure after unsuccessful completion."
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "Scan UUIDv7."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Durable worker job UUIDv7."
+          },
+          "producer": {
+            "type": "string",
+            "description": "Stable producer adapter selector."
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server request time."
+          },
+          "snapshot_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Published snapshot UUIDv7 after successful completion."
+          },
+          "source": {
+            "$ref": "#/components/schemas/RecipeCatalogSourceResponse",
+            "description": "Exact immutable source requested by the server."
+          },
+          "state": {
+            "type": "string",
+            "description": "Durable queue state."
+          }
+        }
+      },
+      "RecipeCatalogScanSourceRequest": {
+        "type": "object",
+        "description": "Pinned source requested for a durable catalog scan.",
+        "required": [
+          "locator",
+          "revision"
+        ],
+        "properties": {
+          "locator": {
+            "type": "string",
+            "description": "Absolute credential-free HTTPS Git repository URL."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Full lowercase 40-character Git commit hash."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecipeCatalogSnapshotPage": {
+        "type": "object",
+        "description": "Cursor page of immutable catalog snapshot metadata.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeCatalogSnapshotSummaryResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "RecipeCatalogSnapshotResponse": {
+        "type": "object",
+        "description": "Immutable catalog snapshot including its complete bounded manifest.",
+        "required": [
+          "summary",
+          "manifest"
+        ],
+        "properties": {
+          "manifest": {
+            "$ref": "#/components/schemas/RecipeCatalogManifestResponse",
+            "description": "Complete canonical manifest."
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RecipeCatalogSnapshotSummaryResponse",
+            "description": "Snapshot metadata."
+          }
+        }
+      },
+      "RecipeCatalogSnapshotSummaryResponse": {
+        "type": "object",
+        "description": "Immutable catalog snapshot metadata.",
+        "required": [
+          "id",
+          "worker_id",
+          "producer",
+          "source",
+          "manifest_digest",
+          "recipe_count",
+          "diagnostic_count",
+          "observed_at"
+        ],
+        "properties": {
+          "diagnostic_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of safe validation diagnostics.",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "description": "Snapshot UUIDv7."
+          },
+          "manifest_digest": {
+            "type": "string",
+            "description": "Lowercase SHA-256 digest of the canonical manifest."
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server receipt time."
+          },
+          "producer": {
+            "type": "string",
+            "description": "Stable producer adapter name."
+          },
+          "recipe_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of normalized recipes.",
+            "minimum": 0
+          },
+          "source": {
+            "$ref": "#/components/schemas/RecipeCatalogSourceResponse",
+            "description": "Pinned source observation."
+          },
+          "worker_id": {
+            "type": "string",
+            "description": "Authenticated publishing worker UUIDv7."
+          }
+        }
+      },
+      "RecipeCatalogSourceResponse": {
+        "type": "object",
+        "description": "Pinned builder-neutral catalog source.",
+        "required": [
+          "locator",
+          "revision"
+        ],
+        "properties": {
+          "locator": {
+            "type": "string",
+            "description": "Stable source locator."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Exact opaque source revision observed by the worker."
+          }
+        }
+      },
+      "RecipePage": {
+        "type": "object",
+        "description": "Cursor page of recipes.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "RecipeResponse": {
+        "type": "object",
+        "description": "Recipe metadata response.",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "revision"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 recipe identity."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique operator-facing name."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Mutable metadata revision.",
+            "minimum": 0
+          }
+        }
+      },
+      "RecipeRevisionList": {
+        "type": "object",
+        "description": "Immutable recipe revision collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeRevisionResponse"
+            },
+            "description": "Revisions sorted by sequence."
+          }
+        }
+      },
+      "RecipeRevisionResponse": {
+        "type": "object",
+        "description": "Immutable recipe revision response.",
+        "required": [
+          "id",
+          "recipe_id",
+          "sequence",
+          "builder",
+          "definition",
+          "required_capabilities",
+          "created_at"
+        ],
+        "properties": {
+          "builder": {
+            "type": "string",
+            "description": "Stable builder adapter name."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "definition": {
+            "description": "Adapter definition represented as JSON."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 immutable revision identity."
+          },
+          "recipe_id": {
+            "type": "string",
+            "description": "Parent recipe identity."
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Required worker capabilities."
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Monotonic sequence within the recipe.",
+            "minimum": 0
+          }
+        }
+      },
+      "RejectReleaseRequest": {
+        "type": "object",
+        "description": "Explicit release rejection request.",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Required safe operator reason."
+          }
+        }
+      },
+      "ReleaseAvailabilityResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The release may be published if its verification/lifecycle permits it.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "available"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The release was withdrawn and cannot be promoted or resolved.",
+            "required": [
+              "reason",
+              "at",
+              "kind"
+            ],
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Withdrawal timestamp."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "withdrawn"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "description": "Operator explanation."
+              }
+            }
+          }
+        ],
+        "description": "Publication eligibility of an immutable release."
+      },
+      "ReleasePage": {
+        "type": "object",
+        "description": "Cursor-paginated releases for one software item.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReleaseResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque cursor for the next page."
+          }
+        }
+      },
+      "ReleaseResponse": {
+        "type": "object",
+        "description": "One immutable release with its highest achieved lifecycle state.",
+        "required": [
+          "availability",
+          "id",
+          "software_id",
+          "version",
+          "state",
+          "created_at",
+          "revision"
+        ],
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/ReleaseAvailabilityResponse",
+            "description": "Publication eligibility independent of attained lifecycle."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 release identity."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          },
+          "software_id": {
+            "type": "string",
+            "description": "Parent software identity."
+          },
+          "state": {
+            "type": "string",
+            "description": "Highest achieved lifecycle state."
+          },
+          "version": {
+            "type": "string",
+            "description": "Exact opaque upstream version."
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "description": "Administrative password reset request.",
+        "required": [
+          "new_password"
+        ],
+        "properties": {
+          "new_password": {
+            "type": "string",
+            "format": "password",
+            "description": "New password."
+          }
+        }
+      },
+      "ResolutionResponse": {
+        "type": "object",
+        "description": "Deterministic resolver result.",
+        "required": [
+          "channel",
+          "release",
+          "variant",
+          "artifact_digest",
+          "artifact_size",
+          "content_path"
+        ],
+        "properties": {
+          "artifact_digest": {
+            "type": "string",
+            "description": "SHA-256 primary installer identity."
+          },
+          "artifact_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Exact primary installer size.",
+            "minimum": 0
+          },
+          "channel": {
+            "type": "string",
+            "description": "Channel used for resolution."
+          },
+          "content_path": {
+            "type": "string",
+            "description": "Authenticated immutable content endpoint."
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseResponse",
+            "description": "Selected release."
+          },
+          "variant": {
+            "$ref": "#/components/schemas/VariantResponse",
+            "description": "Selected variant."
+          }
+        }
+      },
+      "RoleList": {
+        "type": "object",
+        "description": "Role collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleResponse"
+            },
+            "description": "Built-in and custom roles."
+          }
+        }
+      },
+      "RoleResponse": {
+        "type": "object",
+        "description": "Role and permission response.",
+        "required": [
+          "name",
+          "permissions",
+          "built_in",
+          "revision"
+        ],
+        "properties": {
+          "built_in": {
+            "type": "boolean",
+            "description": "Whether the role is immutable."
+          },
+          "name": {
+            "type": "string",
+            "description": "Role name."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sorted permission names."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          }
+        }
+      },
+      "RotatedWorkerCredentialResponse": {
+        "type": "object",
+        "description": "One-time rotated worker credential and current metadata.",
+        "required": [
+          "worker",
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "format": "password",
+            "description": "New raw credential returned exactly once."
+          },
+          "worker": {
+            "$ref": "#/components/schemas/WorkerResponse",
+            "description": "Updated worker metadata."
+          }
+        }
+      },
+      "RunLogPage": {
+        "type": "object",
+        "description": "Cursor-paginated ordered run logs.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunLogResponse"
+            },
+            "description": "Current ordered page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque exclusive cursor for the next page."
+          }
+        }
+      },
+      "RunLogResponse": {
+        "type": "object",
+        "description": "Exact-byte ordered run-log entry.",
+        "required": [
+          "attempt_id",
+          "sequence",
+          "stream",
+          "message_base64",
+          "occurred_at"
+        ],
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "description": "Emitting attempt UUIDv7."
+          },
+          "message_base64": {
+            "type": "string",
+            "description": "Exact entry bytes encoded with standard base64."
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server receipt time."
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Monotonic sequence across the run.",
+            "minimum": 0
+          },
+          "stream": {
+            "type": "string",
+            "description": "`stdout`, `stderr`, or `system`."
+          }
+        }
+      },
+      "RunPage": {
+        "type": "object",
+        "description": "Cursor page of durable runs.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunSummaryResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "RunResponse": {
+        "type": "object",
+        "description": "Durable run response.",
+        "required": [
+          "id",
+          "recipe_revision_id",
+          "software_id",
+          "state",
+          "parameters",
+          "created_at"
+        ],
+        "properties": {
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Terminal completion time."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 run identity."
+          },
+          "parameters": {
+            "description": "Declared non-secret parameters."
+          },
+          "recipe_revision_id": {
+            "type": "string",
+            "description": "Immutable recipe revision identity."
+          },
+          "result": {
+            "description": "Terminal typed worker result or failure."
+          },
+          "software_id": {
+            "type": "string",
+            "description": "Software identity."
+          },
+          "state": {
+            "type": "string",
+            "description": "Durable lifecycle state."
+          }
+        }
+      },
+      "RunSummaryResponse": {
+        "type": "object",
+        "description": "Lightweight run representation used by bounded collection responses.",
+        "required": [
+          "id",
+          "recipe_revision_id",
+          "software_id",
+          "state",
+          "created_at"
+        ],
+        "properties": {
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Terminal completion time."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 run identity."
+          },
+          "recipe_revision_id": {
+            "type": "string",
+            "description": "Immutable recipe revision identity."
+          },
+          "software_id": {
+            "type": "string",
+            "description": "Software identity."
+          },
+          "state": {
+            "type": "string",
+            "description": "Durable lifecycle state."
+          }
+        }
+      },
+      "SoftwareChannelStatusResponse": {
+        "type": "object",
+        "description": "Published channel with the exact opaque version and concurrency revision.",
+        "required": [
+          "name",
+          "release_id",
+          "version",
+          "revision"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Channel name."
+          },
+          "release_id": {
+            "type": "string",
+            "description": "Release identity."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Channel concurrency revision.",
+            "minimum": 0
+          },
+          "version": {
+            "type": "string",
+            "description": "Opaque version."
+          }
+        }
+      },
+      "SoftwarePage": {
+        "type": "object",
+        "description": "Cursor-paginated software collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SoftwareResponse"
+            },
+            "description": "Current page of resources."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque cursor for the next page."
+          }
+        }
+      },
+      "SoftwareResponse": {
+        "type": "object",
+        "description": "Software representation.",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "created_at",
+          "revision"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 identity."
+          },
+          "installation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstallationMetadata",
+                "description": "Declarative installation and installed-state detection metadata."
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          },
+          "slug": {
+            "type": "string",
+            "description": "Unique lowercase URL slug."
+          }
+        }
+      },
+      "SoftwareStatusResponse": {
+        "type": "object",
+        "description": "Bounded operator view of execution and publication for one software item.",
+        "required": [
+          "software_id",
+          "channels",
+          "enabled_targets",
+          "outstanding_runs",
+          "blocked_targets"
+        ],
+        "properties": {
+          "blocked_targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockedTargetResponse"
+            },
+            "description": "First 200 enabled targets without a matching worker observed in the last five minutes."
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SoftwareChannelStatusResponse"
+            },
+            "description": "Current published channels."
+          },
+          "enabled_targets": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Enabled target count.",
+            "minimum": 0
+          },
+          "last_success_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Last successful check, including no-change observations."
+          },
+          "latest_run": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RunSummaryResponse",
+                "description": "Latest run observation."
+              }
+            ]
+          },
+          "next_run_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Next recurring check."
+          },
+          "outstanding_runs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Queued and running builds.",
+            "minimum": 0
+          },
+          "software_id": {
+            "type": "string",
+            "description": "Software identity."
+          }
+        }
+      },
+      "StoreList": {
+        "type": "object",
+        "description": "Configured store collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoreResponse"
+            },
+            "description": "Stores known to the control plane."
+          }
+        }
+      },
+      "StoreResponse": {
+        "type": "object",
+        "description": "Configured artifact store and its application-facing capabilities.",
+        "required": [
+          "id",
+          "name",
+          "role",
+          "kind",
+          "enabled",
+          "revision",
+          "read",
+          "write",
+          "delete",
+          "range",
+          "multipart",
+          "redirect"
+        ],
+        "properties": {
+          "delete": {
+            "type": "boolean",
+            "description": "Whether deletion is supported."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether placement and serving may use this store."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 store identity."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Stable adapter kind."
+          },
+          "multipart": {
+            "type": "boolean",
+            "description": "Whether multipart ingestion is supported."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique operator-facing name."
+          },
+          "range": {
+            "type": "boolean",
+            "description": "Whether single byte ranges are supported."
+          },
+          "read": {
+            "type": "boolean",
+            "description": "Whether full object reads are supported."
+          },
+          "redirect": {
+            "type": "boolean",
+            "description": "Whether redirects or presigned URLs are supported."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string",
+            "description": "Placement role."
+          },
+          "write": {
+            "type": "boolean",
+            "description": "Whether streaming writes are supported."
+          }
+        }
+      },
+      "StoreTestResponse": {
+        "type": "object",
+        "description": "Non-mutating store adapter health result.",
+        "required": [
+          "healthy",
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "Safe human-readable result."
+          },
+          "healthy": {
+            "type": "boolean",
+            "description": "Whether the configured adapter responded as expected."
+          }
+        }
+      },
+      "UpdateBuildTargetRequest": {
+        "type": "object",
+        "description": "Build target configuration update.",
+        "properties": {
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Enable or disable triggering."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Replacement unique operator-facing name."
+          },
+          "next_run_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Replacement recurring cursor; requires an interval policy."
+          },
+          "parameters": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Complete replacement non-secret builder parameters.",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "recipe_revision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Replacement exact immutable recipe revision UUIDv7."
+          },
+          "schedule": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BuildTargetSchedulePayload",
+                "description": "Replacement manual or recurring policy."
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdatePrincipalRequest": {
+        "type": "object",
+        "description": "Principal status or role-assignment replacement.",
+        "properties": {
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "New enabled state."
+          },
+          "roles": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Complete replacement role set."
+          }
+        }
+      },
+      "UpdateSoftwareRequest": {
+        "type": "object",
+        "description": "Mutable software fields; exactly one field changes per request.",
+        "properties": {
+          "installation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstallationMetadata",
+                "description": "Complete replacement installation and detection metadata."
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Replacement human-readable display name."
+          }
+        }
+      },
+      "UpdateWorkerRequest": {
+        "type": "object",
+        "description": "Worker capability-ceiling or status update.",
+        "properties": {
+          "allowed_capabilities": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Complete replacement capability ceiling."
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "New enabled state."
+          }
+        }
+      },
+      "UploadArtifactResponse": {
+        "type": "object",
+        "description": "Verified artifact ingestion response.",
+        "required": [
+          "digest",
+          "size",
+          "reused"
+        ],
+        "properties": {
+          "digest": {
+            "type": "string",
+            "description": "Lowercase SHA-256 digest."
+          },
+          "reused": {
+            "type": "boolean",
+            "description": "Whether existing verified content was reused."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Exact verified size.",
+            "minimum": 0
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "description": "One field-level validation failure.",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable validation code."
+          },
+          "field": {
+            "type": "string",
+            "description": "Request field or parameter."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable diagnostic."
+          }
+        }
+      },
+      "VariantArtifactResponse": {
+        "type": "object",
+        "description": "An artifact and its role within a variant.",
+        "required": [
+          "digest",
+          "size",
+          "media_type",
+          "role",
+          "readable"
+        ],
+        "properties": {
+          "digest": {
+            "type": "string",
+            "description": "SHA-256 content identity."
+          },
+          "media_type": {
+            "type": "string",
+            "description": "Media type."
+          },
+          "readable": {
+            "type": "boolean",
+            "description": "Whether content can currently be served."
+          },
+          "role": {
+            "type": "string",
+            "description": "Semantic artifact role."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Exact byte size.",
+            "minimum": 0
+          }
+        }
+      },
+      "VariantList": {
+        "type": "object",
+        "description": "Release variant collection.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantResponse"
+            },
+            "description": "All variants for the release."
+          }
+        }
+      },
+      "VariantResponse": {
+        "type": "object",
+        "description": "One compatibility-specific release variant.",
+        "required": [
+          "id",
+          "release_id",
+          "platform",
+          "architecture",
+          "resolution_priority",
+          "artifacts"
+        ],
+        "properties": {
+          "architecture": {
+            "type": "string",
+            "description": "Target architecture."
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantArtifactResponse"
+            },
+            "description": "Attached immutable artifacts."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 variant identity."
+          },
+          "maximum_macos": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Inclusive maximum macOS version."
+          },
+          "minimum_macos": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Inclusive minimum macOS version."
+          },
+          "platform": {
+            "type": "string",
+            "description": "Target platform."
+          },
+          "release_id": {
+            "type": "string",
+            "description": "Parent release identity."
+          },
+          "resolution_priority": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Explicit resolver priority."
+          }
+        }
+      },
+      "WorkerCredentialResponse": {
+        "type": "object",
+        "description": "One-time worker credential file contents.",
+        "required": [
+          "worker_id",
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "format": "password",
+            "description": "One-time bearer token written directly to an owner-only file."
+          },
+          "worker_id": {
+            "type": "string",
+            "description": "Server-assigned worker identity."
+          }
+        }
+      },
+      "WorkerPage": {
+        "type": "object",
+        "description": "Cursor page of workers.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkerResponse"
+            },
+            "description": "Current page."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaque next cursor."
+          }
+        }
+      },
+      "WorkerResponse": {
+        "type": "object",
+        "description": "Administrative worker status and capabilities.",
+        "required": [
+          "draining",
+          "id",
+          "name",
+          "allowed_capabilities",
+          "advertised_capabilities",
+          "enabled",
+          "last_seen_at",
+          "revision"
+        ],
+        "properties": {
+          "advertised_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Latest detected advertisement."
+          },
+          "allowed_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Server-defined capability ceiling."
+          },
+          "draining": {
+            "type": "boolean",
+            "description": "Whether new claims are paused while existing attempts finish."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the worker can authenticate."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUIDv7 worker identity."
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Latest registration activity."
+          },
+          "name": {
+            "type": "string",
+            "description": "Operator-facing name."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Optimistic-concurrency revision.",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearer_auth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Authentication and principals"
+    },
+    {
+      "name": "software",
+      "description": "Software catalog"
+    },
+    {
+      "name": "releases",
+      "description": "Release lifecycle and rejection"
+    },
+    {
+      "name": "variants",
+      "description": "Compatibility-specific release outputs"
+    },
+    {
+      "name": "channels",
+      "description": "Transactional promotion targets"
+    },
+    {
+      "name": "resolver",
+      "description": "Deterministic installer resolution"
+    },
+    {
+      "name": "artifacts",
+      "description": "Immutable artifact metadata and content"
+    },
+    {
+      "name": "stores",
+      "description": "Artifact store inspection and health"
+    },
+    {
+      "name": "recipes",
+      "description": "Immutable builder recipes and revisions"
+    },
+    {
+      "name": "recipe-catalogs",
+      "description": "Worker-observed pinned recipe catalogs"
+    },
+    {
+      "name": "build-targets",
+      "description": "Desired manual and recurring build policy"
+    },
+    {
+      "name": "runs",
+      "description": "Durable scheduled builder runs"
+    },
+    {
+      "name": "workers",
+      "description": "Worker provisioning and administration"
+    },
+    {
+      "name": "jobs",
+      "description": "Builder-neutral scheduling state"
+    },
+    {
+      "name": "audit",
+      "description": "Append-only audit evidence"
+    },
+    {
+      "name": "system",
+      "description": "Service metadata"
+    }
+  ]
+}

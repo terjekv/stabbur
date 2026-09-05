@@ -1,0 +1,261 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  static-checks:
+    name: Formatting and documentation
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install Rust components
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master 2026-08-04
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Lint Markdown
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24
+        with:
+          config: .markdownlint.json
+          globs: "**/*.md"
+      - name: Lint host and acceptance scripts
+        run: shellcheck scripts/*.sh
+      - name: Verify the systemd server unit
+        run: scripts/check-systemd-unit.sh
+
+  lint:
+    name: Clippy, rustdoc, and build inputs
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install Rust components
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master 2026-08-04
+        with:
+          toolchain: stable
+          components: clippy,rust-docs
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Build rustdoc
+        run: cargo doc --workspace --all-features --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - name: Check Docker workspace manifest parity
+        run: python3 scripts/check-docker-manifests.py
+
+  openapi-contract:
+    name: OpenAPI drift
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: Check committed contract
+        run: cargo run --locked -- openapi --check
+      - name: Exercise OpenAPI semantics
+        run: cargo test --locked --lib openapi
+
+  test:
+    name: ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Linux-x86_64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - name: Linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: macOS-aarch64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+          - name: Windows-x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master 2026-08-04
+        with:
+          toolchain: stable
+          targets: ${{ matrix.platform.target }}
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          shared-key: ${{ matrix.platform.target }}-test
+      - name: Run workspace tests
+        run: cargo test --workspace --all-targets --all-features --locked --target ${{ matrix.platform.target }}
+      - name: Build the Linux server installer binary
+        if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
+        run: cargo build --locked --target ${{ matrix.platform.target }}
+      - name: Exercise the idempotent Linux server installer
+        if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          sudo scripts/install-server-linux.sh \
+            --binary target/${{ matrix.platform.target }}/debug/stabbur-server
+          sudo scripts/install-server-linux.sh \
+            --binary target/${{ matrix.platform.target }}/debug/stabbur-server
+          sudo scripts/install-server-linux.sh \
+            --binary target/${{ matrix.platform.target }}/debug/stabbur-server \
+            --start
+          curl --fail --silent http://127.0.0.1:8080/healthz >/dev/null
+          sudo systemctl stop stabbur-server.service
+          sudo test -x /usr/local/bin/stabbur-server
+          sudo test "$(stat -c %a /var/lib/stabbur)" = 700
+          sudo systemd-analyze verify /etc/systemd/system/stabbur-server.service
+      - name: Validate macOS launchd definitions
+        if: matrix.platform.target == 'aarch64-apple-darwin'
+        run: plutil -lint docs/examples/launchd/com.stabbur.server.plist docs/examples/launchd/com.stabbur.worker.plist
+      - name: Build the macOS server/worker E2E binary
+        if: matrix.platform.target == 'aarch64-apple-darwin'
+        run: cargo build --locked --target ${{ matrix.platform.target }}
+      - name: Exercise the idempotent macOS worker installer
+        if: matrix.platform.target == 'aarch64-apple-darwin'
+        run: |
+          credential_file="$(mktemp)"
+          trap 'rm -f "$credential_file"' EXIT
+          printf '%s\n' \
+            '{"worker_id":"018f0000-0000-7000-8000-000000000001","token":"ci-installer-fixture-not-a-secret"}' \
+            >"$credential_file"
+          chmod 0600 "$credential_file"
+          sudo scripts/install-worker-macos.sh \
+            --binary target/${{ matrix.platform.target }}/debug/stabbur-server \
+            --server-url https://stabbur.invalid \
+            --credential-file "$credential_file"
+          sudo scripts/install-worker-macos.sh \
+            --binary target/${{ matrix.platform.target }}/debug/stabbur-server \
+            --server-url https://stabbur.invalid \
+            --credential-file "$credential_file"
+          sudo test -x /usr/local/bin/stabbur-server
+          test "$(sudo stat -f %Lp /usr/local/var/lib/stabbur-worker/credential.json)" = 600
+          test "$(sudo plutil -extract EnvironmentVariables.STABBUR_SERVER_URL raw -o - \
+            /Library/LaunchDaemons/com.stabbur.worker.plist)" = https://stabbur.invalid
+      - name: Install the pinned AutoPkg fixture and verify worker preparation
+        if: matrix.platform.target == 'aarch64-apple-darwin'
+        timeout-minutes: 20
+        run: scripts/live-worker-prepare-autopkg.sh
+        env:
+          STABBUR_DISPOSABLE_MACOS: "1"
+          STABBUR_SERVER_BIN: target/aarch64-apple-darwin/debug/stabbur-server
+      - name: Run the live macOS server/worker E2E
+        if: matrix.platform.target == 'aarch64-apple-darwin'
+        run: scripts/live-worker-e2e.sh
+        env:
+          STABBUR_SERVER_BIN: target/aarch64-apple-darwin/debug/stabbur-server
+
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master 2026-08-04
+        with:
+          toolchain: "1.88"
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          shared-key: msrv
+      - name: Check workspace at MSRV
+        run: cargo check --workspace --all-targets --all-features --locked
+
+  supply-chain:
+    name: Dependency, advisory, and license policy
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master 2026-08-04
+        with:
+          toolchain: "1.88"
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked --version 0.22.2
+      - name: Scan the complete lockfile for RustSec advisories
+        run: cargo audit
+      - name: Check advisories, licenses, bans, and sources
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          rust-version: "1.88"
+
+  container-build:
+    name: Production container
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check Docker workspace manifest parity
+        run: python3 scripts/check-docker-manifests.py
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - name: Build production image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: stabbur-server:ci
+          build-args: |
+            CARGO_BUILD_FLAGS=--locked --release
+            STABBUR_BUILD_GIT_SHA=${{ github.sha }}
+          cache-from: type=gha,scope=server-container
+          cache-to: type=gha,mode=max,scope=server-container
+      - name: Smoke test production image
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run --rm --detach --publish 18080:8080 stabbur-server:ci)"
+          trap 'docker stop "$container_id"' EXIT
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/readyz >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container_id"
+          exit 1
+
+  ci-gate:
+    name: CI gate
+    if: always()
+    needs:
+      - static-checks
+      - lint
+      - openapi-contract
+      - test
+      - msrv
+      - supply-chain
+      - container-build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all validation jobs to pass
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: jq --exit-status 'all(.[]; .result == "success")' <<< "$JOB_RESULTS"

@@ -1,0 +1,19 @@
+[package]
+name = "stabbur-storage-runtime"
+description = "Opaque storage backend selection and composition for Stabbur"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+stabbur-storage-core = { version = "0.1.0", path = "../stabbur-storage-core" }
+stabbur-storage-sqlite = { version = "0.1.0", path = "../stabbur-storage-sqlite" }
+thiserror.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

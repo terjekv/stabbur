@@ -1,0 +1,41 @@
+[Unit]
+Description=Stabbur control plane and filesystem artifact repository
+After=local-fs.target network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=stabbur
+Group=stabbur
+ExecStart=/usr/local/bin/stabbur-server api --data-dir /var/lib/stabbur --bind 127.0.0.1:8080
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+UMask=0077
+
+StateDirectory=stabbur
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

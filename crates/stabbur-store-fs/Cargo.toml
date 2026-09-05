@@ -1,0 +1,28 @@
+[package]
+name = "stabbur-store-fs"
+description = "Durable local content-addressed artifact store for Stabbur"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+fs2.workspace = true
+serde.workspace = true
+async-trait.workspace = true
+futures-util.workspace = true
+hex.workspace = true
+sha2.workspace = true
+stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
+stabbur-store-core = { version = "0.1.0", path = "../stabbur-store-core" }
+tokio.workspace = true
+tokio-util.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+bytes.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

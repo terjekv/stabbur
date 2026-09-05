@@ -1,0 +1,23 @@
+[package]
+name = "stabbur-storage-core"
+description = "Aggregate-shaped persistence capabilities for Stabbur"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stabbur-auth-core = { version = "0.1.0", path = "../stabbur-auth-core" }
+stabbur-builder-core = { version = "0.1.0", path = "../stabbur-builder-core" }
+stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
+stabbur-jobs-core = { version = "0.1.0", path = "../stabbur-jobs-core" }
+stabbur-store-core = { version = "0.1.0", path = "../stabbur-store-core" }
+thiserror.workspace = true
+
+[lints]
+workspace = true

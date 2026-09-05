@@ -1,0 +1,22 @@
+[package]
+name = "stabbur-auth-core"
+description = "Authentication primitives and authorization policy for Stabbur"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+argon2.workspace = true
+chrono.workspace = true
+hex.workspace = true
+rand.workspace = true
+serde.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

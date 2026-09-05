@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "result": "passed",
+  "recorded_at": "2026-09-05T18:38:10.120000+00:00",
+  "host": "arm64",
+  "macos": "26.6.2",
+  "installation_requested": false,
+  "sources": {
+    "stabbur": {
+      "commit": null,
+      "dirty": true
+    },
+    "stabbur-client-rust": {
+      "commit": null,
+      "dirty": true
+    },
+    "stabbur-cli": {
+      "commit": null,
+      "dirty": true
+    },
+    "stabbur-frontend": {
+      "commit": null,
+      "dirty": true
+    }
+  },
+  "binaries": {
+    "server": "077aec1f211cb877eb7e88bf1a87c89a0e2708ee0a506665b62333e4cd772b31",
+    "cli": "5d66ed58c67968ba81d6f9639e7aaeb7c7fba06cf48076524bdbd63be3ca0c1e",
+    "frontend": "f492041dccce6e00587ebe157ae3eb3a156476cfef0a865fc7557a215116c89e"
+  },
+  "stage": "complete",
+  "autopkg": "2.9.0",
+  "browser": "catalog review/apply, trigger, logs, promotion, withdrawal, logout/login, expiry passed",
+  "munki_version": "7.2.0.5787",
+  "munki": "export-validated; installation intentionally skipped",
+  "delivery": {
+    "version": "1.0",
+    "sha256": "b914abcc994ffee7b1495027089ab33faaa246ba57fc1b8f26c16b05d892f968",
+    "recipe_commit": "6c092b47e9c6324aa48758832b2597a0f3ff932e",
+    "logs_present": true
+  },
+  "recovery": "consistent backup restore, server SIGKILL, expired lease reclaim, stale lease fencing passed",
+  "withdrawal": "future resolution/export denied; prior delivery snapshot retained"
+}
