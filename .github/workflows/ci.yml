@@ -111,7 +111,7 @@ jobs:
         with:
           shared-key: ${{ matrix.platform.target }}-test
       - name: Run workspace tests
-        run: cargo test --workspace --all-targets --all-features --locked --target ${{ matrix.platform.target }}
+        run: cargo test --workspace --all-targets --all-features --locked --no-fail-fast --target ${{ matrix.platform.target }}
       - name: Build the Linux server installer binary
         if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
         run: cargo build --locked --target ${{ matrix.platform.target }}

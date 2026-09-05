@@ -260,7 +260,7 @@ fn validate_manifest(manifest: &PrepareManifest) -> Result<()> {
         bail!("AutoPkg installer manifest builder must be `autopkg`");
     }
     validate_opaque_version(&manifest.version)?;
-    require_absolute(&manifest.package.path, "AutoPkg installer package")?;
+    require_macos_absolute(&manifest.package.path, "AutoPkg installer package")?;
     validate_identifier(&manifest.package.identifier)?;
     match manifest.package.signature.policy {
         InstallerSignaturePolicy::DeveloperId => {
@@ -277,7 +277,7 @@ fn validate_manifest(manifest: &PrepareManifest) -> Result<()> {
         }
         InstallerSignaturePolicy::Unsigned => {}
     }
-    require_absolute(
+    require_macos_absolute(
         &manifest.health_check.program,
         "AutoPkg health-check program",
     )?;
@@ -354,6 +354,17 @@ fn validate_team_id(team_id: &str) -> Result<()> {
 fn require_absolute(path: &Path, field: &str) -> Result<()> {
     if !path.is_absolute() {
         bail!("{field} path must be absolute");
+    }
+    Ok(())
+}
+
+// Manifest paths describe the macOS worker, independently of the validation host.
+fn require_macos_absolute(path: &Path, field: &str) -> Result<()> {
+    if !path
+        .to_str()
+        .is_some_and(|value| value.starts_with('/') && !value.contains('\0'))
+    {
+        bail!("{field} path must be an absolute macOS path");
     }
     Ok(())
 }
@@ -853,6 +864,23 @@ mod tests {
         invalid_version.version = "1.2.3".into();
         invalid_version.health_check.expected_output.clear();
         assert!(validate_manifest(&invalid_version).is_err());
+    }
+
+    #[test]
+    fn manifest_paths_use_macos_semantics_on_every_host() {
+        for path in [
+            "relative.pkg",
+            "C:/autopkg.pkg",
+            "~/autopkg.pkg",
+            "/tmp/invalid\0.pkg",
+        ] {
+            let digest = Sha256Digest::new("a".repeat(64)).unwrap();
+            let mut value = manifest(PathBuf::from(path), digest);
+            assert!(validate_manifest(&value).is_err());
+            value.package.path = PathBuf::from("/private/tmp/autopkg.pkg");
+            value.health_check.program = PathBuf::from(path);
+            assert!(validate_manifest(&value).is_err());
+        }
     }
 
     #[test]
