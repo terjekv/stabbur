@@ -37,7 +37,8 @@ fn application_sources_do_not_import_concrete_database_adapters() {
     }
 
     let manifest = fs::read_to_string(repository_root().join("Cargo.toml"))
-        .expect("workspace manifest must be readable");
+        .expect("workspace manifest must be readable")
+        .replace("\r\n", "\n");
     let package_dependencies = manifest
         .split_once("\n[dependencies]\n")
         .expect("root dependency section must exist")
