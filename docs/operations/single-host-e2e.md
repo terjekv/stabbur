@@ -85,15 +85,26 @@ after the test. AutoPkg and Munki tooling remain installed until the VM is disca
 
 ## GitHub configuration and evidence
 
-The workflow currently names repositories under `stabbur-dev`. Set these to the actual repository
-owner if different. For private siblings, provide `STABBUR_REPOSITORIES_READ_TOKEN` with read access
-to those repositories. Public siblings use the ordinary job token. Checkout credentials are not
-persisted, and this token is never passed to workers or browser tests. Fork pull requests cannot
-use a private-repository secret; run coordinated private checks from a trusted branch.
+The four repositories are public under `terjekv`. Each checkout uses an ordinary read-only job
+token without persisting credentials. No personal access token or cross-repository secret is
+needed. Workers and browser tests receive only their disposable local server credentials.
 
-Manual dispatch accepts client, CLI and frontend refs. Use commit SHAs for repeatability; defaults
-of `main` are development integration. The job records every checked revision. The final JSON
-report records source revisions and dirty status, binary hashes, tool versions, the last stage,
-and individual acceptance results. Only that report is uploaded, including on failure. Databases,
+The workflow pins reviewed client, CLI and frontend commit SHAs. Manual dispatch can override
+those refs for coordinated review. The job records every checked revision. The final JSON report
+records source revisions and dirty status, binary hashes, tool versions, the last stage, and
+individual acceptance results. Only that report is uploaded, including on failure. Databases,
 credentials, process logs, browser traces and authentication state are excluded from CI artifacts.
 This is source-build evidence, not an immutable released-container compatibility claim.
+
+## Publish and verify a server image
+
+After CI and single-host acceptance pass, dispatch `publish-image.yml` on the same `main` commit
+with the acceptance workflow run ID. The publication gate requires successful CI for all four
+exact revisions, clean source trees, and completed macOS acceptance with installation enabled.
+It rejects evidence from another server revision, pull requests, and local non-installation runs.
+
+The job builds the production Linux amd64 image, pushes it to GHCR with a source-commit tag, and
+runs the supported client's live suite and independent consumer against the returned immutable
+`@sha256` digest. Only a successful compatibility check produces the `published-server-image`
+evidence artifact. Use that digest when recording compatibility; a pushed tag alone is not
+compatibility evidence. The job uses its scoped GitHub token to publish and pull its own package.

@@ -7,13 +7,13 @@ on:
     inputs:
       client_ref:
         description: Client commit or branch for coordinated review
-        default: main
+        default: ce95bd9b724cf1e5d49bcf8516b6b29bf05605ee
       cli_ref:
         description: CLI commit or branch for coordinated review
-        default: main
+        default: 3f0320ec93c181c8b28828a1680de93e8c15ea45
       frontend_ref:
         description: Console commit or branch for coordinated review
-        default: main
+        default: 1d8f4c9439af26909d57c4b00f460d918602e373
 permissions:
   contents: read
 concurrency:
@@ -38,25 +38,22 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          repository: stabbur-dev/stabbur-client-rust
-          ref: ${{ inputs.client_ref || 'main' }}
+          repository: terjekv/stabbur-client-rust
+          ref: ${{ inputs.client_ref || 'ce95bd9b724cf1e5d49bcf8516b6b29bf05605ee' }}
           path: stabbur-client-rust
           persist-credentials: false
-          token: ${{ secrets.STABBUR_REPOSITORIES_READ_TOKEN || github.token }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          repository: stabbur-dev/stabbur-cli
-          ref: ${{ inputs.cli_ref || 'main' }}
+          repository: terjekv/stabbur-cli
+          ref: ${{ inputs.cli_ref || '3f0320ec93c181c8b28828a1680de93e8c15ea45' }}
           path: stabbur-cli
           persist-credentials: false
-          token: ${{ secrets.STABBUR_REPOSITORIES_READ_TOKEN || github.token }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          repository: stabbur-dev/stabbur-frontend
-          ref: ${{ inputs.frontend_ref || 'main' }}
+          repository: terjekv/stabbur-frontend
+          ref: ${{ inputs.frontend_ref || '1d8f4c9439af26909d57c4b00f460d918602e373' }}
           path: stabbur-frontend
           persist-credentials: false
-          token: ${{ secrets.STABBUR_REPOSITORIES_READ_TOKEN || github.token }}
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
         with:
           toolchain: stable
