@@ -102,12 +102,25 @@ impl FsArtifactStore {
 
     async fn sync_directory(path: &Path) -> Result<(), StoreError> {
         let path = path.to_owned();
-        tokio::task::spawn_blocking(move || std::fs::File::open(path)?.sync_all())
-            .await
-            .map_err(|_| StoreError::Backend {
-                message: "directory sync task failed".into(),
-            })?
-            .map_err(|error| backend("syncing object directory", &error))
+        tokio::task::spawn_blocking(move || {
+            let mut options = std::fs::OpenOptions::new();
+            options.read(true);
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::OpenOptionsExt;
+
+                // Directory handles require backup semantics. FlushFileBuffers,
+                // which implements sync_all on Windows, also requires write access.
+                const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+                options.write(true).custom_flags(FILE_FLAG_BACKUP_SEMANTICS);
+            }
+            options.open(path)?.sync_all()
+        })
+        .await
+        .map_err(|_| StoreError::Backend {
+            message: "directory sync task failed".into(),
+        })?
+        .map_err(|error| backend("syncing object directory", &error))
     }
 }
 

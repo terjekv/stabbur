@@ -188,8 +188,9 @@ case "$requested_uid" in
   auto) ;;
   '' | *[!0-9]*) die "worker UID must be auto or an integer in 450-499" ;;
   *)
-    [ "$requested_uid" -ge 450 ] && [ "$requested_uid" -le 499 ] \
-      || die "worker UID must be in Apple's role-account range 450-499"
+    if [ "$requested_uid" -lt 450 ] || [ "$requested_uid" -gt 499 ]; then
+      die "worker UID must be in Apple's role-account range 450-499"
+    fi
     ;;
 esac
 
@@ -239,8 +240,9 @@ existing_uid=$(dscl_value UniqueID)
 case "$existing_uid" in
   '' | *[!0-9]*) die "existing $worker_user account has an invalid UID" ;;
   *)
-    [ "$existing_uid" -ge 450 ] && [ "$existing_uid" -le 499 ] \
-      || die "existing $worker_user account is not a macOS role account"
+    if [ "$existing_uid" -lt 450 ] || [ "$existing_uid" -gt 499 ]; then
+      die "existing $worker_user account is not a macOS role account"
+    fi
     ;;
 esac
 [ "$(dscl_value PrimaryGroupID)" = "$worker_gid" ] \
