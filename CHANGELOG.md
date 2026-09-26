@@ -9,6 +9,8 @@ All notable changes to Stabbur server are documented here.
 
 ### Fixed
 
+- Normalize Git inventory paths and preserve the minimal Git process environment on Windows.
+
 - Explain that macOS test console login requires the exact printed Management UI address.
 - Show macOS test installation options in top-level help and identify conflicting loopback ports
   with an actionable `--api-port` / `--web-port` hint.

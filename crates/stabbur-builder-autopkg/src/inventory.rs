@@ -224,9 +224,18 @@ async fn pinned_local_source(
     repositories: &mut BTreeMap<PathBuf, Option<RecipeCatalogSource>>,
 ) -> Option<RecipeCatalogSource> {
     let directory = path.parent()?;
-    let root = PathBuf::from(git_text(directory, &["rev-parse", "--show-toplevel"]).await?);
+    let root = std::fs::canonicalize(PathBuf::from(
+        git_text(directory, &["rev-parse", "--show-toplevel"]).await?,
+    ))
+    .ok()?;
     let canonical = std::fs::canonicalize(path).ok()?;
-    let relative = canonical.strip_prefix(&root).ok()?.to_str()?;
+    let relative = canonical
+        .strip_prefix(&root)
+        .ok()?
+        .components()
+        .map(|component| component.as_os_str().to_str())
+        .collect::<Option<Vec<_>>>()?
+        .join("/");
     if !repositories.contains_key(&root) {
         let source = async {
             if !git_text(&root, &["status", "--porcelain", "--untracked-files=all"])
@@ -266,22 +275,29 @@ async fn git_text(directory: &Path, args: &[&str]) -> Option<String> {
         .map(|value| value.trim().to_owned())
 }
 async fn git_bytes(directory: &Path, args: &[&str], maximum: usize) -> Option<Vec<u8>> {
+    let null_file = if cfg!(windows) { "NUL" } else { "/dev/null" };
+    let hooks = format!("core.hooksPath={null_file}");
     let mut command = Command::new("git");
     command
-        .args([
-            "-c",
-            "core.fsmonitor=false",
-            "-c",
-            "core.hooksPath=/dev/null",
-        ])
+        .args(["-c", "core.fsmonitor=false", "-c", &hooks])
         .args(args)
         .current_dir(directory)
         .env_clear()
-        .env("PATH", "/usr/bin:/bin")
         .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_GLOBAL", null_file)
         .env("GIT_OPTIONAL_LOCKS", "0")
         .env("GIT_TERMINAL_PROMPT", "0");
+    #[cfg(unix)]
+    command.env("PATH", "/usr/bin:/bin");
+    #[cfg(windows)]
+    {
+        // Keep executable/DLL discovery while excluding credentials and ambient Git settings.
+        for name in ["PATH", "SystemRoot"] {
+            if let Some(value) = std::env::var_os(name) {
+                command.env(name, value);
+            }
+        }
+    }
     bounded_output(&mut command, maximum).await.ok()
 }
 
@@ -512,7 +528,9 @@ mod tests {
             ],
         )
         .await;
-        let path = temp.path().join("fixture.recipe");
+        let directory = temp.path().join("recipes");
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("fixture.recipe");
         let bytes = b"fixture committed bytes";
         std::fs::write(&path, bytes).unwrap();
         setup(temp.path(), &["add", "."]).await;
