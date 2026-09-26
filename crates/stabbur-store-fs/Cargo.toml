@@ -14,8 +14,8 @@ async-trait.workspace = true
 futures-util.workspace = true
 hex.workspace = true
 sha2.workspace = true
-stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
-stabbur-store-core = { version = "0.1.0", path = "../stabbur-store-core" }
+stabbur-domain = { version = "0.0.1", path = "../stabbur-domain" }
+stabbur-store-core = { version = "0.0.1", path = "../stabbur-store-core" }
 tokio.workspace = true
 tokio-util.workspace = true
 uuid.workspace = true

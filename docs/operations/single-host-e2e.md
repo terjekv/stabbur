@@ -18,10 +18,14 @@ See [GitHub's runner reference](https://docs.github.com/en/actions/reference/run
    integration passes against identical pinned OpenAPI documents.
 2. A tiny script-free package containing one text file is generated with Apple's `pkgbuild`.
    A local appcast advertises that exact package with version `1.0`.
-3. The browser logs in, reviews and applies a catalog plan, and triggers an AutoPkg build target.
+3. The worker scans the pinned source and publishes its immutable discovery snapshot. The console
+   imports the selected recipe into a disabled manual target without starting a build. The fixture
+   then applies its explicitly reviewed input overrides. The browser logs in, reviews and applies
+   the resulting catalog plan, and triggers an AutoPkg build target.
    AutoPkg 2.9.0 runs the XLD download recipe from the pinned upstream recipe commit with only
    `NAME` and `SPARKLE_FEED_URL` inputs changed. Its name is incidental: the recipe's appcast and
-   download processors consume the fixture. No XLD application is downloaded or installed.
+   download processors consume the fixture. The build validates the imported normalized `version`
+   and `pathname` output selectors. No XLD application is downloaded or installed.
 4. The worker uploads the output, the server verifies it and creates a candidate. Browser log
    inspection and promotion run through the frontend and supported client. A stale promotion
    revision is rejected. CLI export must preserve the exact generated package SHA-256 and map
@@ -98,13 +102,26 @@ This is source-build evidence, not an immutable released-container compatibility
 
 ## Publish and verify a server image
 
-After CI and single-host acceptance pass, dispatch `publish-image.yml` on the same `main` commit
-with the acceptance workflow run ID. The publication gate requires successful CI for all four
+After single-host acceptance passes on the current `main` commit, `publish-image.yml` starts
+automatically. Manual dispatch with the acceptance workflow run ID remains available for retries.
+The publication gate requires successful CI for all four
 exact revisions, clean source trees, and completed macOS acceptance with installation enabled.
 It rejects evidence from another server revision, pull requests, and local non-installation runs.
 
-The job builds the production Linux amd64 image, pushes it to GHCR with a source-commit tag, and
-runs the supported client's live suite and independent consumer against the returned immutable
-`@sha256` digest. Only a successful compatibility check produces the `published-server-image`
-evidence artifact. Use that digest when recording compatibility; a pushed tag alone is not
-compatibility evidence. The job uses its scoped GitHub token to publish and pull its own package.
+The job builds the production Linux amd64 image with provenance, pushes it to GHCR with a
+source-commit tag, and runs the supported client's live suite and independent consumer against
+the returned immutable `@sha256` digest. The same digest must also pass CLI reconciliation/import
+and console browser acceptance, using the exact client, CLI and frontend revisions from macOS
+acceptance. Only successful compatibility checks produce the `published-server-image` evidence
+artifact. Use that digest when recording compatibility; a pushed tag alone is not compatibility
+evidence. The job uses its scoped GitHub token to publish and pull its own package.
+After compatibility passes, it creates the versioned server source release with the OpenAPI
+contract and image evidence attached. An existing version tag is never moved to different source.
+
+To repeat the coordinated image check locally with Docker and the browser tooling available:
+
+```sh
+/private/tmp/stabbur-e2e-python/bin/python scripts/check-workspace-integration.py \
+  --target target --browser \
+  --server-image ghcr.io/terjekv/stabbur-server@sha256:REPLACE_WITH_VERIFIED_DIGEST
+```

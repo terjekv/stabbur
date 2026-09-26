@@ -8,8 +8,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-stabbur-storage-core = { version = "0.1.0", path = "../stabbur-storage-core" }
-stabbur-storage-sqlite = { version = "0.1.0", path = "../stabbur-storage-sqlite" }
+stabbur-storage-core = { version = "0.0.1", path = "../stabbur-storage-core" }
+stabbur-storage-sqlite = { version = "0.0.1", path = "../stabbur-storage-sqlite" }
 thiserror.workspace = true
 
 [lints]

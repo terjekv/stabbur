@@ -7,7 +7,7 @@ acknowledge the report, coordinate a fix and advisory, and credit the reporter w
 
 ## Supported versions
 
-Until the first stable release, only the latest v0.1 release candidate is supported. After v0.1,
+Until the first stable release, only the latest v0.0.1 release candidate is supported. After v0.0.1,
 the latest patch release in the current minor line receives security fixes.
 
 ## Deployment requirements

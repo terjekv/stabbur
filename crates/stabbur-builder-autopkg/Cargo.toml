@@ -11,9 +11,9 @@ repository.workspace = true
 plist.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-stabbur-builder-core = { version = "0.1.0", path = "../stabbur-builder-core" }
-stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
-stabbur-jobs-core = { version = "0.1.0", path = "../stabbur-jobs-core" }
+stabbur-builder-core = { version = "0.0.1", path = "../stabbur-builder-core" }
+stabbur-domain = { version = "0.0.1", path = "../stabbur-domain" }
+stabbur-jobs-core = { version = "0.0.1", path = "../stabbur-jobs-core" }
 thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import time
 
 REPOSITORIES = ('stabbur', 'stabbur-client-rust', 'stabbur-cli', 'stabbur-frontend')
 
@@ -43,10 +44,24 @@ def validate_run(run, sha, workflow):
             'Workflow has not passed')
 
 
+def completed_ci(name, revision, timeout):
+    deadline = time.monotonic() + timeout
+    while True:
+        runs = api(f'repos/terjekv/{name}/actions/workflows/ci.yml/runs?'
+                   f'head_sha={revision}&branch=main&event=push&per_page=100')['workflow_runs']
+        latest = max(runs, key=lambda item: item['run_number']) if runs else None
+        if latest and latest.get('status') == 'completed':
+            validate_run(latest, revision, 'ci.yml')
+            return latest
+        require(time.monotonic() < deadline, f'No completed main CI evidence for {name}')
+        time.sleep(min(15, max(0, deadline - time.monotonic())))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--acceptance-run-id', required=True)
     parser.add_argument('--evidence-dir', type=Path, required=True)
+    parser.add_argument('--wait-for-ci-seconds', type=int, default=0, choices=range(0, 1801))
     args = parser.parse_args()
     require(re.fullmatch(r'[1-9][0-9]{0,19}', args.acceptance_run_id) is not None, 'Invalid run ID')
     require(os.environ['GITHUB_REPOSITORY'] == 'terjekv/stabbur', 'Unexpected repository')
@@ -64,17 +79,15 @@ def main():
     sources = validate_report(json.loads(report_file.read_text()), sha)
     ci_runs = {}
     for name, revision in sources.items():
-        runs = api(f'repos/terjekv/{name}/actions/workflows/ci.yml/runs?'
-                   f'head_sha={revision}&branch=main&event=push&per_page=100')['workflow_runs']
-        require(bool(runs), f'No main CI evidence for {name}')
-        latest = max(runs, key=lambda item: item['run_number'])
-        validate_run(latest, revision, 'ci.yml')
+        latest = completed_ci(name, revision, args.wait_for_ci_seconds)
         ci_runs[name] = latest['html_url']
     evidence = {'schema_version': 1, 'sources': sources, 'ci_runs': ci_runs,
                 'acceptance_run': run['html_url']}
     (args.evidence_dir / 'publication-inputs.json').write_text(json.dumps(evidence, indent=2) + '\n')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
         output.write(f"client_sha={sources['stabbur-client-rust']}\n")
+        output.write(f"cli_sha={sources['stabbur-cli']}\n")
+        output.write(f"frontend_sha={sources['stabbur-frontend']}\n")
     print('All four source revisions passed CI; exact server revision passed macOS installation acceptance.')
 
 

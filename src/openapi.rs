@@ -12,7 +12,7 @@ use crate::{
 #[openapi(
     info(
         title = "Stabbur API",
-        version = "0.1.0",
+        version = "0.0.1",
         description = "Software artifact control plane and outbound worker coordination API"
     ),
     paths(

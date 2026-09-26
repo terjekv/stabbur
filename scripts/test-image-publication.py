@@ -4,10 +4,14 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('publication', Path(__file__).with_name('verify-image-publication.py'))
 publication = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(publication)
+release_spec = importlib.util.spec_from_file_location('release', Path(__file__).with_name('publish-server-release.py'))
+release = importlib.util.module_from_spec(release_spec)
+release_spec.loader.exec_module(release)
 SHA = 'a' * 40
 
 
@@ -48,6 +52,30 @@ class PublicationEvidenceTests(unittest.TestCase):
                              ('conclusion', 'failure'), ('path', '.github/workflows/ci.yml')]:
             with self.subTest(field=field), self.assertRaises(ValueError):
                 publication.validate_run({**run, field: value}, SHA, 'workspace-integration.yml')
+
+    def test_pending_ci_waits_but_failed_ci_is_rejected(self):
+        completed = {'run_number': 1, 'head_sha': SHA, 'head_branch': 'main', 'event': 'push',
+                     'status': 'completed', 'conclusion': 'success', 'path': '.github/workflows/ci.yml'}
+        with patch.object(publication, 'api', side_effect=[{'workflow_runs': []}, {'workflow_runs': [completed]}]), \
+                patch.object(publication.time, 'sleep'):
+            self.assertEqual(publication.completed_ci('stabbur', SHA, 30), completed)
+        with patch.object(publication, 'api', return_value={'workflow_runs': [{**completed, 'conclusion': 'failure'}]}), \
+                self.assertRaises(ValueError):
+            publication.completed_ci('stabbur', SHA, 30)
+        with patch.object(publication, 'api', return_value={'workflow_runs': []}), self.assertRaises(ValueError):
+            publication.completed_ci('stabbur', SHA, 0)
+
+    def test_versioned_release_requires_all_consumers_and_exact_image_source(self):
+        evidence = {'schema_version': 1, 'sources': {'stabbur': SHA}, 'platform': 'linux/amd64',
+                    'image': 'ghcr.io/terjekv/stabbur-server@sha256:' + 'b' * 64,
+                    **{name + '_compatibility': 'passed' for name in ('client', 'cli', 'console')}}
+        self.assertEqual(release.validate(evidence, SHA), evidence['image'])
+        for field, value in [('image', 'ghcr.io/terjekv/stabbur-server:latest'),
+                             ('sources', {'stabbur': 'c' * 40}), ('platform', 'linux/arm64'),
+                             ('client_compatibility', 'failed'), ('cli_compatibility', None),
+                             ('console_compatibility', 'not requested')]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                release.validate({**evidence, field: value}, SHA)
 
 
 if __name__ == '__main__':

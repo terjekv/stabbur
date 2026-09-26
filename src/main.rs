@@ -103,6 +103,12 @@ struct WorkerArgs {
     /// Optional builder-neutral catalog manifest published after authenticated registration.
     #[arg(long, env = "STABBUR_RECIPE_CATALOG_MANIFEST")]
     catalog_manifest: Option<PathBuf>,
+    /// Discover this worker account's AutoPkg recipes every five minutes (read-only).
+    #[arg(long, env = "STABBUR_DISCOVER_AUTOPKG")]
+    discover_autopkg: bool,
+    /// Local AutoPkg preferences file used only for discovery.
+    #[arg(long, env = "STABBUR_AUTOPKG_PREFS", requires = "discover_autopkg")]
+    autopkg_prefs: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -307,6 +313,9 @@ async fn main() -> Result<()> {
                 &arguments.data_dir,
                 arguments.autopkg_program.as_deref(),
                 arguments.catalog_manifest.as_deref(),
+                arguments
+                    .discover_autopkg
+                    .then_some(arguments.autopkg_prefs.as_deref()),
             )
             .await
         }

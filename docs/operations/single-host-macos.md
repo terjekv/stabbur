@@ -126,7 +126,7 @@ to create the first artifact, candidate, stable channel, resolution, and verifie
 The durable repository is `/usr/local/var/lib/stabbur`. The worker directory contains execution
 state and its bearer credential, not artifact metadata. Back it up separately if credential
 continuity matters, or provision a new worker identity after recovery. Stop both launchd jobs
-before taking the safest v0.1 backup:
+before taking the safest v0.0.1 backup:
 
 ```bash
 sudo launchctl bootout system/com.stabbur.worker

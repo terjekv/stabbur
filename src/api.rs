@@ -3219,6 +3219,9 @@ impl From<RecipeCatalogSource> for RecipeCatalogSourceResponse {
 /// Builder-neutral recipe observed in a pinned catalog.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct RecipeCatalogEntryResponse {
+    /// Complete pinned source closure; absent when a recipe needs attention before import.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    import_sources: Option<Vec<RecipeCatalogSourceResponse>>,
     /// Builder-owned stable identifier or entrypoint.
     identifier: String,
     /// Stable builder adapter selector.
@@ -3232,6 +3235,9 @@ pub struct RecipeCatalogEntryResponse {
 impl From<RecipeCatalogEntry> for RecipeCatalogEntryResponse {
     fn from(value: RecipeCatalogEntry) -> Self {
         Self {
+            import_sources: value
+                .import_sources
+                .map(|sources| sources.as_slice().iter().cloned().map(Into::into).collect()),
             identifier: value.identifier,
             builder: value.builder,
             parents: value.parents,
@@ -3411,7 +3417,7 @@ pub struct RecipeCatalogScanSourceRequest {
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateRecipeCatalogScanRequest {
-    /// Stable producer adapter. v0.1 supports `autopkg`.
+    /// Stable producer adapter. v0.0.1 supports `autopkg`.
     producer: String,
     /// Exact immutable source to inspect.
     source: RecipeCatalogScanSourceRequest,
@@ -3708,7 +3714,7 @@ pub(crate) async fn create_recipe_catalog_scan(
             vec![ValidationError {
                 field: "producer".into(),
                 code: "unsupported_catalog_producer".into(),
-                message: "v0.1 supports the `autopkg` producer.".into(),
+                message: "v0.0.1 supports the `autopkg` producer.".into(),
             }],
             &request_id,
         ));
@@ -5917,8 +5923,8 @@ pub(crate) async fn create_software(
 ) -> Result<HttpResponse, ApiError> {
     let principal = authenticate(&request, &state, Permission::SoftwareWrite).await?;
     let request_id = request_id(&request);
-    let slug =
-        SoftwareSlug::new(&body.slug).map_err(|error| ApiError::domain(error, &request_id))?;
+    let slug = SoftwareSlug::new(&body.slug)
+        .map_err(|error| ApiError::domain(error, &request_id).with_field("slug"))?;
     if body.name.trim() != body.name || !(1..=255).contains(&body.name.len()) {
         return Err(ApiError::validation(
             "The software name is invalid.",

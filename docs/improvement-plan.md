@@ -51,6 +51,12 @@ explicitly distinguishes this run from the disposable install/detection leg conf
 
 ## Practical limits
 
+The coordinated first release now targets **0.0.1**. September 26 local acceptance also exercises
+a real pinned repository scan, reviewed recipe import, normalized receipt outputs and the expanded
+operator browser regressions. [Recorded evidence](evidence/single-host-local-2026-09-26.json)
+retains the dirty-source and non-installation status; fresh CI installation and published-image
+evidence remain required for 0.0.1.
+
 - The repeatable [single-host macOS suite](operations/single-host-e2e.md) now includes isolated
   headless browser acceptance against real AutoPkg data. It is independent of an attached user
   browser. Backend authentication integration and JavaScript boundary tests remain separate gates.

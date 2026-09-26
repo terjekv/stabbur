@@ -29,9 +29,9 @@ tools. Replacements require the exact installed-manifest digest and never infer 
 opaque version. The repository includes a pinned AutoPkg 2.9.0 fixture and disposable macOS
 acceptance flow. See the [worker operations guide](docs/operations/workers.md#prepare-autopkg-on-macos).
 
-## v0.1 server scope
+## v0.0.1 server scope
 
-The server v0.1 implementation includes:
+The server v0.0.1 implementation includes:
 
 - local human and service identities, Argon2id passwords, short sessions, hashed API and worker
   tokens, custom RBAC roles, one-time bootstrap, and append-only audit events;
@@ -53,9 +53,10 @@ The server v0.1 implementation includes:
 - a committed OpenAPI 3.1 contract plus Linux, macOS, Windows, MSRV, container, rustdoc, dependency,
   license, security, and streaming test gates.
 
-The supported Rust client and user-facing `stabbur` CLI are implemented as independent,
-independently versioned repositories. The optional browser console follows after the CLI-oriented
-v0.1 release. Their release status does not change the server API contract; see
+The supported Rust client, user-facing `stabbur` CLI, and optional browser management console
+are implemented in independent, independently versioned repositories. The console supports
+software, build, release, and publication workflows alongside the CLI. Their release status does
+not change the server API contract; see
 [compatibility](COMPATIBILITY.md) and the [remaining release work](docs/spec-gap-analysis.md).
 
 ## Management console and operator workflows
@@ -132,7 +133,7 @@ real AutoPkg delivery, browser management, Munki export and recovery with dispos
 
 ## Storage boundary
 
-SQLite is the v0.1 backend. Application and domain crates depend only on the complete
+SQLite is the v0.0.1 backend. Application and domain crates depend only on the complete
 `stabbur-storage-core` contract; SQLx and database rows remain private to adapter crates.
 PostgreSQL is the first planned external adapter. MySQL can be implemented later behind the same
 contract and conformance suite without changing handlers, workers, or domain identities. See the
@@ -169,7 +170,7 @@ cargo audit
 ```
 
 The complete bar and recorded review evidence are in the
-[v0.1 release checklist](docs/v0.1-release-checklist.md),
+[v0.0.1 release checklist](docs/v0.0.1-release-checklist.md),
 [security review](docs/security-review.md), and
 [performance review](docs/performance-review.md).
 

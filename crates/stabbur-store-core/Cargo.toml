@@ -13,7 +13,7 @@ bytes.workspace = true
 chrono.workspace = true
 futures-core.workspace = true
 serde.workspace = true
-stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
+stabbur-domain = { version = "0.0.1", path = "../stabbur-domain" }
 thiserror.workspace = true
 
 [lints]

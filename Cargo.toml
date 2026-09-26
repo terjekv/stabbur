@@ -16,7 +16,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 rust-version = "1.88"
 license = "Apache-2.0"
@@ -93,15 +93,15 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
-stabbur-auth-core = { version = "0.1.0", path = "crates/stabbur-auth-core" }
-stabbur-builder-autopkg = { version = "0.1.0", path = "crates/stabbur-builder-autopkg" }
-stabbur-builder-core = { version = "0.1.0", path = "crates/stabbur-builder-core" }
-stabbur-domain = { version = "0.1.0", path = "crates/stabbur-domain" }
-stabbur-jobs-core = { version = "0.1.0", path = "crates/stabbur-jobs-core" }
-stabbur-storage-core = { version = "0.1.0", path = "crates/stabbur-storage-core" }
-stabbur-storage-runtime = { version = "0.1.0", path = "crates/stabbur-storage-runtime" }
-stabbur-store-core = { version = "0.1.0", path = "crates/stabbur-store-core" }
-stabbur-store-fs = { version = "0.1.0", path = "crates/stabbur-store-fs" }
+stabbur-auth-core = { version = "0.0.1", path = "crates/stabbur-auth-core" }
+stabbur-builder-autopkg = { version = "0.0.1", path = "crates/stabbur-builder-autopkg" }
+stabbur-builder-core = { version = "0.0.1", path = "crates/stabbur-builder-core" }
+stabbur-domain = { version = "0.0.1", path = "crates/stabbur-domain" }
+stabbur-jobs-core = { version = "0.0.1", path = "crates/stabbur-jobs-core" }
+stabbur-storage-core = { version = "0.0.1", path = "crates/stabbur-storage-core" }
+stabbur-storage-runtime = { version = "0.0.1", path = "crates/stabbur-storage-runtime" }
+stabbur-store-core = { version = "0.0.1", path = "crates/stabbur-store-core" }
+stabbur-store-fs = { version = "0.0.1", path = "crates/stabbur-store-fs" }
 
 [dev-dependencies]
 actix-web = { workspace = true, features = ["cookies"] }

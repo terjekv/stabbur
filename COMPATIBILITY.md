@@ -1,8 +1,8 @@
 # Compatibility
 
-| Server | HTTP API  | SQLite migration set                     | Public client target                   |
-| ------ | --------- | ---------------------------------------- | -------------------------------------- |
-| 0.1.x  | `/api/v1` | baseline + `0002_operator_workflows.sql` | `stabbur_client` 0.1 release candidate |
+| Server | HTTP API  | SQLite migration set                     | Public client target                     |
+| ------ | --------- | ---------------------------------------- | ---------------------------------------- |
+| 0.0.1  | `/api/v1` | baseline + `0002_operator_workflows.sql` | `stabbur_client` 0.0.1 release candidate |
 
 The committed [OpenAPI document](docs/openapi.json) is the public contract. Internal
 `/api/v1/internal/workers` lease primitives are versioned but deliberately excluded from the public

@@ -44,6 +44,17 @@ pub struct ApiError {
 }
 
 impl ApiError {
+    /// Associates an existing safe diagnostic with a request field without changing its code.
+    #[must_use]
+    pub fn with_field(mut self, field: &'static str) -> Self {
+        self.problem.validation_errors.push(ValidationError {
+            field: field.to_owned(),
+            code: self.problem.code.clone(),
+            message: self.problem.detail.clone(),
+        });
+        self
+    }
+
     /// Creates an error with no field-level validation failures.
     #[must_use]
     pub fn new(

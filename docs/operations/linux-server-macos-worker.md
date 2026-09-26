@@ -1,6 +1,6 @@
 # Linux server and macOS AutoPkg worker
 
-This is the default v0.1 deployment: one standard Linux control-plane host with SQLite and a
+This is the default v0.0.1 deployment: one standard Linux control-plane host with SQLite and a
 private filesystem artifact store, plus one separately supervised native macOS AutoPkg worker.
 The worker initiates outbound HTTPS; the Linux server never connects to the Mac or executes a
 remote shell.
@@ -432,5 +432,5 @@ To upgrade either host, rerun its installer with the new native binary and `--st
 atomically replaces files and restarts an already-active service only when activation was explicit.
 Check the server health endpoint and worker registration after either operation.
 
-v0.1 does not provide manual package import, direct directory serving, Munki export, replication,
+v0.0.1 does not provide manual package import, direct directory serving, Munki export, replication,
 or automatic store repair. Packages enter the primary store only through a validated worker result.

@@ -2,9 +2,23 @@
 
 All notable changes to Stabbur server are documented here.
 
-## Unreleased
+## [0.0.1] - 2026-09-26
+
+- Target the first coordinated release as 0.0.1.
+- Update rustls to 0.23.45 to address RUSTSEC-2026-0285 without advisory exceptions.
+
+### Fixed
+
+- Explain that macOS test console login requires the exact printed Management UI address.
+- Show macOS test installation options in top-level help and identify conflicting loopback ports
+  with an actionable `--api-port` / `--web-port` hint.
+- Associate invalid software slugs with their input field without changing the public error code.
+- Extend coordinated browser acceptance to linked operator workflows, inline validation, catalog
+  review, named build controls and small-screen navigation. Document the first-delivery workflow.
 
 ### Added
+
+- Add opt-in AutoPkg worker inventory discovery with pinned parent source closures and safe import diagnostics. Publish import sources on immutable catalog snapshots and normalize single-run receipt output variables for reviewed imports.
 
 - Add single-host macOS acceptance across all four repositories: headless management workflows,
   deterministic real AutoPkg delivery, guarded Munki install/detection, backup restore, crash/lease
@@ -71,7 +85,7 @@ All notable changes to Stabbur server are documented here.
 - Fail AutoPkg replacement closed when the local receipt is absent or differs from the manifest's
   explicit precondition; never infer ordering from version strings.
 
-## 0.1.0 - 2026-08-26
+## Initial development - 2026-08-26
 
 ### Added
 

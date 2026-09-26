@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "result": "passed",
+  "recorded_at": "2026-09-26T08:32:29.913837+00:00",
+  "host": "arm64",
+  "macos": "27.0",
+  "installation_requested": false,
+  "sources": {
+    "stabbur": {
+      "commit": "a4d10c8be1410ad5b9b2c21a96b86e0df804b59b",
+      "dirty": true
+    },
+    "stabbur-client-rust": {
+      "commit": "b6754e85505388b82cd76a053b73b0956549ee5e",
+      "dirty": true
+    },
+    "stabbur-cli": {
+      "commit": "36ec320fd4ebd643431c663d3af277dc11060300",
+      "dirty": true
+    },
+    "stabbur-frontend": {
+      "commit": "418e09a53956cdd97d4b3f7ec40163520f60dd8a",
+      "dirty": true
+    }
+  },
+  "binaries": {
+    "server": "f889ed2cba585a4379ed1a196e2cee3040b17c046b5f256018ba8f67bb67d59d",
+    "cli": "a0fb229435261679d3f9d6d935c2d0113dc209f41ac9699725cbdf0f463db9a5",
+    "frontend": "cb296ee0ba5541c574d6b4a9a30fd26b1f4afa2bfedd7ce4455cdfef32b0b2a5"
+  },
+  "stage": "complete",
+  "autopkg": "2.9.0",
+  "recipe_import": "pinned worker scan, disabled manual import, reviewed fixture inputs",
+  "browser": "catalog review/apply, trigger, logs, promotion, withdrawal, logout/login, expiry passed",
+  "munki_version": "6.6.3.4704",
+  "munki": "export-validated; installation intentionally skipped",
+  "delivery": {
+    "version": "1.0",
+    "sha256": "cb39f6a8f3fd5844540d9bee07eda01d03dbe42a591f9edd1c3f371d09529c54",
+    "recipe_commit": "6c092b47e9c6324aa48758832b2597a0f3ff932e",
+    "logs_present": true
+  },
+  "recovery": "consistent backup restore, server SIGKILL, expired lease reclaim, stale lease fencing passed",
+  "withdrawal": "future resolution/export denied; prior delivery snapshot retained"
+}

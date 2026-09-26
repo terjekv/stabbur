@@ -27,10 +27,59 @@ pub struct RecipeCatalogSource {
     pub revision: String,
 }
 
+/// Validated, canonical source closure for importing a discovered recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    try_from = "Vec<RecipeCatalogSource>",
+    into = "Vec<RecipeCatalogSource>"
+)]
+pub struct RecipeImportSources(Vec<RecipeCatalogSource>);
+
+impl RecipeImportSources {
+    /// Validates a nonempty, bounded set of exact source observations.
+    pub fn new(mut sources: Vec<RecipeCatalogSource>) -> Result<Self, RecipeCatalogError> {
+        if sources.is_empty() || sources.len() > 16 {
+            return Err(RecipeCatalogError::TooLarge);
+        }
+        for source in &sources {
+            validate_catalog_text(&source.locator)?;
+            validate_catalog_text(&source.revision)?;
+        }
+        sources.sort_by(|a, b| a.locator.cmp(&b.locator));
+        if sources
+            .windows(2)
+            .any(|pair| pair[0].locator == pair[1].locator)
+        {
+            return Err(RecipeCatalogError::NonCanonical);
+        }
+        Ok(Self(sources))
+    }
+
+    /// Returns the immutable pinned observations.
+    pub fn as_slice(&self) -> &[RecipeCatalogSource] {
+        &self.0
+    }
+}
+
+impl TryFrom<Vec<RecipeCatalogSource>> for RecipeImportSources {
+    type Error = RecipeCatalogError;
+    fn try_from(value: Vec<RecipeCatalogSource>) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+impl From<RecipeImportSources> for Vec<RecipeCatalogSource> {
+    fn from(value: RecipeImportSources) -> Self {
+        value.0
+    }
+}
+
 /// One normalized recipe observed in a catalog source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecipeCatalogEntry {
+    /// Complete pinned source closure, absent when discovery cannot prove reproducibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import_sources: Option<RecipeImportSources>,
     /// Builder-owned stable recipe identifier or entrypoint.
     pub identifier: String,
     /// Stable builder adapter selector, such as `autopkg`.
@@ -263,7 +312,7 @@ pub struct RecipeCatalogScanJob {
 impl RecipeCatalogScanJob {
     /// Current catalog-scan worker protocol version.
     pub const SCHEMA_VERSION: u32 = 1;
-    /// v0.1 control-plane scan deadline.
+    /// v0.0.1 control-plane scan deadline.
     pub const DEFAULT_EXECUTION_TIMEOUT_SECONDS: u32 = 30 * 60;
 
     /// Creates the current versioned catalog-scan envelope.
@@ -409,7 +458,7 @@ pub struct BuilderJob {
 impl BuilderJob {
     /// Current worker job schema version.
     pub const SCHEMA_VERSION: u32 = 1;
-    /// v0.1 control-plane execution deadline.
+    /// v0.0.1 control-plane execution deadline.
     pub const DEFAULT_EXECUTION_TIMEOUT_SECONDS: u32 = 6 * 60 * 60;
 
     /// Creates the current versioned worker envelope.
@@ -596,6 +645,7 @@ mod tests {
                 revision: "a".repeat(40),
             },
             recipes: vec![RecipeCatalogEntry {
+                import_sources: None,
                 identifier: "com.example.firefox".into(),
                 builder: "autopkg".into(),
                 parents: vec!["com.example.download.firefox".into()],
@@ -628,7 +678,7 @@ mod tests {
             uploaded_artifacts: vec![digest],
             provenance: Provenance {
                 builder: "fake/1".into(),
-                worker_version: "0.1.0".into(),
+                worker_version: "0.0.1".into(),
                 operating_system: "test".into(),
                 tools: BTreeMap::new(),
                 sources: vec![],
@@ -714,5 +764,23 @@ mod tests {
             failure.validate_for(&request),
             Err(RecipeCatalogError::InvalidText)
         );
+    }
+}
+
+#[cfg(test)]
+mod import_source_tests {
+    use super::*;
+    #[test]
+    fn source_proof_deserialization_cannot_bypass_validation() {
+        assert!(serde_json::from_str::<RecipeImportSources>("[]").is_err());
+        assert!(
+            serde_json::from_str::<RecipeImportSources>(r#"[{"locator":" ","revision":"exact"}]"#)
+                .is_err()
+        );
+        let source = RecipeCatalogSource {
+            locator: "https://example.test/repo".into(),
+            revision: "opaque".into(),
+        };
+        assert!(RecipeImportSources::new(vec![source.clone(), source]).is_err());
     }
 }

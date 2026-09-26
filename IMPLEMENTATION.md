@@ -1,6 +1,6 @@
 # Implementation boundary
 
-The server v0.1 feature surface is implemented. This document identifies the architectural seams
+The server v0.0.1 feature surface is implemented. This document identifies the architectural seams
 that must remain stable as later adapters and clients are added.
 
 ## Runtime composition
@@ -38,7 +38,7 @@ that must remain stable as later adapters and clients are added.
   tests; a real-socket 64 MiB streaming/range test; OpenAPI operation coverage; and supply-chain
   policy checks.
 
-## Deliberate v0.1 limits
+## Deliberate v0.0.1 limits
 
 - SQLite and the private local primary artifact store are the only linked production adapters.
 - Production TLS, request-rate controls, and general HTTP hardening headers are supplied by the

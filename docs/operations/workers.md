@@ -56,7 +56,7 @@ server-side ceiling with that complete list (or a deliberate superset); a partia
 as `worker_capability_escalation`. Re-run the inspection after tool upgrades and change the ceiling
 through the administrative API before restarting a worker whose detected list grew.
 
-Use one provisioned identity per independently supervised execution slot. v0.1 executes one job at
+Use one provisioned identity per independently supervised execution slot. v0.0.1 executes one job at
 a time per worker process. Increase parallelism by provisioning more identities and processes,
 preferably with separate private data directories.
 

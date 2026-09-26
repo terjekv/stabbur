@@ -956,12 +956,14 @@ async fn assert_recipe_catalog_contract(
         },
         recipes: vec![
             RecipeCatalogEntry {
+                import_sources: None,
                 identifier: "com.example.alpha".into(),
                 builder: "contract-run".into(),
                 parents: vec![],
                 required_capabilities: capabilities.clone(),
             },
             RecipeCatalogEntry {
+                import_sources: None,
                 identifier: "com.example.beta".into(),
                 builder: "contract-run".into(),
                 parents: vec!["com.example.alpha".into()],
@@ -1153,6 +1155,7 @@ async fn assert_recipe_catalog_scan_contract(
         producer: "contract-run".into(),
         source,
         recipes: vec![RecipeCatalogEntry {
+            import_sources: None,
             identifier: "com.example.scanned".into(),
             builder: "contract-run".into(),
             parents: vec![],
@@ -1434,7 +1437,7 @@ async fn assert_build_catalog_contract(
         uploaded_artifacts: vec![digest.clone()],
         provenance: Provenance {
             builder: "contract/1".to_owned(),
-            worker_version: "0.1.0".to_owned(),
+            worker_version: "0.0.1".to_owned(),
             operating_system: "contract".to_owned(),
             tools: BTreeMap::new(),
             sources: vec![],

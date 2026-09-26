@@ -7,7 +7,7 @@
       "name": "Apache-2.0",
       "identifier": "Apache-2.0"
     },
-    "version": "0.1.0"
+    "version": "0.0.1"
   },
   "paths": {
     "/api/v1/artifacts/{digest}": {
@@ -4211,7 +4211,7 @@
         "properties": {
           "producer": {
             "type": "string",
-            "description": "Stable producer adapter. v0.1 supports `autopkg`."
+            "description": "Stable producer adapter. v0.0.1 supports `autopkg`."
           },
           "source": {
             "$ref": "#/components/schemas/RecipeCatalogScanSourceRequest",
@@ -4906,6 +4906,16 @@
           "identifier": {
             "type": "string",
             "description": "Builder-owned stable identifier or entrypoint."
+          },
+          "import_sources": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecipeCatalogSourceResponse"
+            },
+            "description": "Complete pinned source closure; absent when a recipe needs attention before import."
           },
           "parents": {
             "type": "array",

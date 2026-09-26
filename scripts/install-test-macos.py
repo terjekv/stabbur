@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
+import errno
 import fcntl
 import hashlib
 import json
@@ -40,6 +41,19 @@ SAFE_PATH = '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin'
 
 class SetupError(Exception):
     """An operator-facing error that contains no subprocess output or secrets."""
+
+
+class InstallerParser(argparse.ArgumentParser):
+    """Expose installation options from both the main and install help commands."""
+
+    install_parser = None
+
+    def format_help(self):
+        text = super().format_help()
+        if self.install_parser is not None:
+            text += '\nInstallation options (place after install):\n\n'
+            text += self.install_parser.format_help()
+        return text
 
 
 def path_value(value):
@@ -108,7 +122,11 @@ def reserve_ports(ports):
             listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             listener.bind(('127.0.0.1', port))
     except OSError as error:
-        raise SetupError('A requested loopback port is occupied; choose different ports.') from error
+        reason = 'occupied' if error.errno == errno.EADDRINUSE else 'unavailable'
+        raise SetupError(
+            f'Loopback port {port} is {reason}. For a new installation, use '
+            'install --api-port PORT --web-port PORT to choose two different ports '
+            'between 1024 and 65535.') from error
     finally:
         for listener in sockets:
             listener.close()
@@ -529,6 +547,7 @@ def install(args):
             if args.password_file:
                 initial_password.unlink(missing_ok=True)
         print(f'Installed. Management UI: {config.web}\nAPI: {config.api}\nAdministrator: {config.username}')
+        print('Open the exact Management UI address above; localhost and 127.0.0.1 are different login origins.')
         if args.password_file:
             print('Administrator password: supplied password file (temporary copy removed).')
         else:
@@ -539,11 +558,15 @@ def install(args):
 
 
 def parser():
-    result = argparse.ArgumentParser(description=__doc__)
+    result = InstallerParser(
+        description=__doc__,
+        epilog='Custom ports: %(prog)s --prefix /tmp/stabbur install '
+               '--api-port 18080 --web-port 13000')
     result.add_argument('--prefix', default='~/Library/Application Support/Stabbur Test',
                         help='new private installation directory (also used by lifecycle commands)')
     commands = result.add_subparsers(dest='action', required=True)
     setup = commands.add_parser('install', help='create and start a new test installation; never overwrite one')
+    result.install_parser = setup
     for flag, help_text in (
         ('server-data', 'new SQLite and immutable artifact directory'),
         ('worker-data', 'new worker state directory'), ('logs-dir', 'new private logs directory'),
@@ -555,8 +578,8 @@ def parser():
         ('password-file', 'read an owner-only administrator password file; otherwise generate a private password')):
         setup.add_argument('--' + flag, help=help_text)
     setup.add_argument('--username', default='admin')
-    setup.add_argument('--api-port', default=8080, help='loopback API port, 1024–65535 (default: 8080)')
-    setup.add_argument('--web-port', default=3000, help='loopback frontend port, 1024–65535 (default: 3000)')
+    setup.add_argument('--api-port', metavar='PORT', default=8080, help='loopback API port, 1024–65535 (default: 8080)')
+    setup.add_argument('--web-port', metavar='PORT', default=3000, help='loopback frontend port, 1024–65535 (default: 3000)')
     setup.add_argument('--build-profile', choices=('debug', 'release'), default='debug')
     autopkg = setup.add_mutually_exclusive_group()
     autopkg.add_argument('--autopkg-program', help='existing absolute AutoPkg executable (default: detect /Library/AutoPkg/autopkg)')

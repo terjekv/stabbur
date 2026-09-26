@@ -166,6 +166,32 @@ async fn software_workflow_is_authenticated_audited_and_cursor_shaped() {
 }
 
 #[actix_web::test]
+async fn invalid_software_slug_identifies_the_field_without_changing_the_problem_code() {
+    let (state, token, _temp) = authenticated_state().await;
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(state))
+            .configure(configure),
+    )
+    .await;
+    let response = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/v1/software")
+            .insert_header((header::AUTHORIZATION, format!("Bearer {token}")))
+            .insert_header(("Idempotency-Key", "invalid-slug"))
+            .set_json(serde_json::json!({"slug":"Invalid slug!","name":"Example"}))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let problem: serde_json::Value = test::read_body_json(response).await;
+    assert_eq!(problem["code"], "invalid_domain_value");
+    assert_eq!(problem["validation_errors"][0]["field"], "slug");
+    assert!(!problem.to_string().contains("Invalid slug!"));
+}
+
+#[actix_web::test]
 async fn identity_administration_enforces_roles_revocation_and_password_recovery() {
     let (state, admin_token, _temp) = authenticated_state().await;
     let app = test::init_service(
@@ -488,6 +514,7 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
         },
         "recipes": [{
             "identifier": "com.example.firefox",
+            "import_sources": [{"locator": "https://example.test/recipes.git", "revision": "a".repeat(40)}],
             "builder": "autopkg",
             "parents": [],
             "required_capabilities": ["builder.autopkg", "os.macos"]
@@ -540,6 +567,11 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
     assert_eq!(
         catalog["manifest"]["recipes"][0]["identifier"],
         "com.example.firefox"
+    );
+
+    assert_eq!(
+        catalog["manifest"]["recipes"][0]["import_sources"][0]["revision"],
+        "a".repeat(40)
     );
 
     let create_scan = test::TestRequest::post()
@@ -914,7 +946,7 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
                     "uploaded_artifacts": [artifact_digest],
                     "provenance": {
                         "builder": "autopkg/2.7.6",
-                        "worker_version": "0.1.0",
+                        "worker_version": "0.0.1",
                         "operating_system": "macos/15.0",
                         "tools": {"autopkg": "2.7.6"},
                         "sources": [],

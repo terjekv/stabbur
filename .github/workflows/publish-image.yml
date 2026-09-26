@@ -1,5 +1,9 @@
 name: Publish verified server image
 on:
+  workflow_run:
+    workflows: [Cross-repository development integration]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       acceptance_run_id:
@@ -7,7 +11,7 @@ on:
         required: true
         type: string
 permissions:
-  contents: read
+  contents: write
   actions: read
   packages: write
 concurrency:
@@ -15,7 +19,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_sha == github.sha &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -27,15 +36,28 @@ jobs:
         id: evidence
         run: |
           python3 stabbur/scripts/verify-image-publication.py \
-            --acceptance-run-id "$ACCEPTANCE_RUN_ID" --evidence-dir "$RUNNER_TEMP/acceptance"
+            --acceptance-run-id "$ACCEPTANCE_RUN_ID" --evidence-dir "$RUNNER_TEMP/acceptance" \
+            --wait-for-ci-seconds 600
         env:
           GH_TOKEN: ${{ github.token }}
-          ACCEPTANCE_RUN_ID: ${{ inputs.acceptance_run_id }}
+          ACCEPTANCE_RUN_ID: ${{ inputs.acceptance_run_id || github.event.workflow_run.id }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: terjekv/stabbur-client-rust
           ref: ${{ steps.evidence.outputs.client_sha }}
           path: stabbur-client-rust
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: terjekv/stabbur-cli
+          ref: ${{ steps.evidence.outputs.cli_sha }}
+          path: stabbur-cli
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: terjekv/stabbur-frontend
+          ref: ${{ steps.evidence.outputs.frontend_sha }}
+          path: stabbur-frontend
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
         with:
@@ -54,6 +76,7 @@ jobs:
           file: stabbur/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: mode=max
           tags: ghcr.io/terjekv/stabbur-server:sha-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/terjekv/stabbur
@@ -70,6 +93,16 @@ jobs:
         run: scripts/run-integration-tests.sh
         env:
           STABBUR_INTEGRATION_SERVER_IMAGE: ghcr.io/terjekv/stabbur-server@${{ steps.image.outputs.digest }}
+      - name: Exercise CLI and console workflows against the published digest
+        working-directory: stabbur
+        env:
+          IMAGE: ghcr.io/terjekv/stabbur-server@${{ steps.image.outputs.digest }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/stabbur-browser"
+          "$RUNNER_TEMP/stabbur-browser/bin/python" -m pip install -r scripts/requirements-e2e.txt
+          "$RUNNER_TEMP/stabbur-browser/bin/python" -m playwright install --with-deps chromium
+          "$RUNNER_TEMP/stabbur-browser/bin/python" scripts/check-workspace-integration.py \
+            --target target --server-image "$IMAGE" --browser
       - name: Record verified image and source evidence
         env:
           IMAGE: ghcr.io/terjekv/stabbur-server@${{ steps.image.outputs.digest }}
@@ -79,7 +112,9 @@ jobs:
           from pathlib import Path
           directory = Path(os.environ['RUNNER_TEMP']) / 'acceptance'
           evidence = json.loads((directory / 'publication-inputs.json').read_text())
-          evidence.update(image=os.environ['IMAGE'], platform='linux/amd64', client_compatibility='passed')
+          evidence.update(image=os.environ['IMAGE'], platform='linux/amd64',
+                          client_compatibility='passed', cli_compatibility='passed',
+                          console_compatibility='passed')
           (directory / 'published-image.json').write_text(json.dumps(evidence, indent=2) + '\n')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write('Verified server image: `' + os.environ['IMAGE'] + '`\n')
@@ -91,3 +126,10 @@ jobs:
           path: ${{ runner.temp }}/acceptance/published-image.json
           if-no-files-found: error
           retention-days: 90
+      - name: Publish the versioned server source release
+        working-directory: stabbur
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/publish-server-release.py \
+            --evidence "$RUNNER_TEMP/acceptance/published-image.json"

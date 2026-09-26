@@ -115,7 +115,7 @@ open.
 
 ## Coordinated backup
 
-The safest v0.1 backup is an offline copy of the complete data directory:
+The safest v0.0.1 backup is an offline copy of the complete data directory:
 
 1. Stop API and embedded-worker processes and wait for them to exit.
 2. Confirm `stabbur-server admin doctor --data-dir /var/lib/stabbur` succeeds.
@@ -137,7 +137,7 @@ when the storage platform gives a crash-consistent atomic snapshot of the entire
    registration before reopening traffic.
 
 If artifact files were lost after the last backup, metadata may still name `present` locations.
-Keep traffic closed until affected locations are reconciled; v0.1 does not provide replication or
+Keep traffic closed until affected locations are reconciled; v0.0.1 does not provide replication or
 automatic store repair.
 
 ## Upgrade and rollback
@@ -146,11 +146,11 @@ The unreleased development history was squashed into one `0001_initial.sql` base
 first supported release. A SQLite database initialized by an earlier development checkout is not
 upgradeable through that discarded history: export anything needed, stop the service, and recreate
 the database and store test environment from scratch. Never apply that instruction to a released
-deployment. After v0.1 is published, migration history is permanent and only additive forward
+deployment. After v0.0.1 is published, migration history is permanent and only additive forward
 migrations are allowed.
 
 Before an upgrade, read the changelog, take a coordinated backup, and record the current binary or
-image digest. Stop all v0.1 API processes, run the new binary's migration command once, then start
+image digest. Stop all v0.0.1 API processes, run the new binary's migration command once, then start
 the new API before remote workers:
 
 ```bash

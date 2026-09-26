@@ -7,13 +7,13 @@ on:
     inputs:
       client_ref:
         description: Client commit or branch for coordinated review
-        default: ff854987bed6912dccb05660d5c8e4ff45d7375e
+        default: e31e621f6eee771aa47a5d95d6bff83993e413b5
       cli_ref:
         description: CLI commit or branch for coordinated review
-        default: 36ec320fd4ebd643431c663d3af277dc11060300
+        default: 63699eee8639c1380181093c8716c04884322920
       frontend_ref:
         description: Console commit or branch for coordinated review
-        default: 418e09a53956cdd97d4b3f7ec40163520f60dd8a
+        default: 028d664e4e0544c0e41b553ae11454f92ad2dc1a
 permissions:
   contents: read
 concurrency:
@@ -39,19 +39,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-client-rust
-          ref: ${{ inputs.client_ref || 'ff854987bed6912dccb05660d5c8e4ff45d7375e' }}
+          ref: ${{ inputs.client_ref || 'e31e621f6eee771aa47a5d95d6bff83993e413b5' }}
           path: stabbur-client-rust
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-cli
-          ref: ${{ inputs.cli_ref || '36ec320fd4ebd643431c663d3af277dc11060300' }}
+          ref: ${{ inputs.cli_ref || '63699eee8639c1380181093c8716c04884322920' }}
           path: stabbur-cli
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-frontend
-          ref: ${{ inputs.frontend_ref || '418e09a53956cdd97d4b3f7ec40163520f60dd8a' }}
+          ref: ${{ inputs.frontend_ref || '028d664e4e0544c0e41b553ae11454f92ad2dc1a' }}
           path: stabbur-frontend
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
@@ -95,6 +95,13 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/stabbur-browser"
           "$RUNNER_TEMP/stabbur-browser/bin/python" -m pip install -r scripts/requirements-e2e.txt
           "$RUNNER_TEMP/stabbur-browser/bin/python" -m playwright install chromium
+      - name: Exercise discovery, import and operator browser regressions
+        if: runner.os == 'macOS'
+        working-directory: stabbur
+        timeout-minutes: 5
+        run: |
+          "$RUNNER_TEMP/stabbur-browser/bin/python" scripts/check-workspace-integration.py \
+            --target target --no-build --browser
       - name: Exercise real delivery, browser management and recovery on one Mac
         if: runner.os == 'macOS'
         working-directory: stabbur

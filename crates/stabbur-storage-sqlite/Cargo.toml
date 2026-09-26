@@ -14,17 +14,17 @@ fs2.workspace = true
 serde_json.workspace = true
 sqlx-core.workspace = true
 sqlx-sqlite.workspace = true
-stabbur-auth-core = { version = "0.1.0", path = "../stabbur-auth-core" }
-stabbur-builder-core = { version = "0.1.0", path = "../stabbur-builder-core" }
-stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
-stabbur-jobs-core = { version = "0.1.0", path = "../stabbur-jobs-core" }
-stabbur-storage-core = { version = "0.1.0", path = "../stabbur-storage-core" }
-stabbur-store-core = { version = "0.1.0", path = "../stabbur-store-core" }
+stabbur-auth-core = { version = "0.0.1", path = "../stabbur-auth-core" }
+stabbur-builder-core = { version = "0.0.1", path = "../stabbur-builder-core" }
+stabbur-domain = { version = "0.0.1", path = "../stabbur-domain" }
+stabbur-jobs-core = { version = "0.0.1", path = "../stabbur-jobs-core" }
+stabbur-storage-core = { version = "0.0.1", path = "../stabbur-storage-core" }
+stabbur-store-core = { version = "0.0.1", path = "../stabbur-store-core" }
 tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-stabbur-storage-conformance = { version = "0.1.0", path = "../stabbur-storage-conformance" }
+stabbur-storage-conformance = { version = "0.0.1", path = "../stabbur-storage-conformance" }
 tempfile.workspace = true
 
 [lints]

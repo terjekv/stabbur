@@ -21,6 +21,9 @@ use tokio::{
 };
 use url::Url;
 
+mod inventory;
+pub use inventory::discover_autopkg_catalog;
+
 const MAX_SOURCE_COUNT: usize = 16;
 const MAX_SOURCE_URL_BYTES: usize = 2_048;
 const MAX_ENTRYPOINT_BYTES: usize = 255;
@@ -428,8 +431,8 @@ pub enum AutoPkgError {
     /// The recipe definition is incomplete.
     #[error("AutoPkg recipe definition is invalid")]
     InvalidRecipe,
-    /// v0.1 intentionally rejects secret-like inputs.
-    #[error("sensitive AutoPkg inputs are not supported in v0.1")]
+    /// v0.0.1 intentionally rejects secret-like inputs.
+    #[error("sensitive AutoPkg inputs are not supported in v0.0.1")]
     SensitiveInputRejected,
     /// Required tooling is not installed.
     #[error("AutoPkg is not available on this worker")]
@@ -675,10 +678,14 @@ impl AutoPkgCatalogGenerator {
         materialize(source, &source_root).await?;
         let source_url = source.url.clone();
         let source_revision = source.commit.clone();
-        let (recipes, diagnostics) =
-            tokio::task::spawn_blocking(move || scan_catalog_source(&source_root))
-                .await
-                .map_err(|_| AutoPkgError::CatalogGenerationFailed)??;
+        let pinned = source.clone();
+        let (recipes, diagnostics) = tokio::task::spawn_blocking(move || {
+            let (mut recipes, mut diagnostics) = scan_catalog_source(&source_root)?;
+            inventory::enrich_repository(&source_root, &pinned, &mut recipes, &mut diagnostics)?;
+            Ok::<_, AutoPkgError>((recipes, diagnostics))
+        })
+        .await
+        .map_err(|_| AutoPkgError::CatalogGenerationFailed)??;
         let manifest = RecipeCatalogManifest {
             schema_version: RecipeCatalogManifest::SCHEMA_VERSION,
             producer: "autopkg".to_owned(),
@@ -773,21 +780,37 @@ fn scan_catalog_source(
 }
 
 fn recipe_catalog_entry(path: &Path) -> Result<Option<RecipeCatalogEntry>, AutoPkgError> {
-    let bytes = std::fs::read(path).map_err(|_| AutoPkgError::CatalogGenerationFailed)?;
+    let bytes = read_catalog_recipe(path)?;
     let Some(document) = parse_recipe_document(path, &bytes) else {
         return Ok(None);
     };
-    let Some(identifier) = document
+    Ok(catalog_entry_from_document(path, &document))
+}
+
+fn read_catalog_recipe(path: &Path) -> Result<Vec<u8>, AutoPkgError> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .and_then(|file| file.take(MAX_RECIPE_FILE_BYTES + 1).read_to_end(&mut bytes))
+        .map_err(|_| AutoPkgError::CatalogGenerationFailed)?;
+    if bytes.len() as u64 > MAX_RECIPE_FILE_BYTES {
+        return Err(AutoPkgError::CatalogGenerationFailed);
+    }
+    Ok(bytes)
+}
+
+fn catalog_entry_from_document(
+    path: &Path,
+    document: &serde_json::Value,
+) -> Option<RecipeCatalogEntry> {
+    let identifier = document
         .get("Identifier")
         .and_then(serde_json::Value::as_str)
         .map(ToOwned::to_owned)
         .or_else(|| {
             path.file_name()
                 .map(|name| name.to_string_lossy().into_owned())
-        })
-    else {
-        return Ok(None);
-    };
+        })?;
     let parents = document
         .get("ParentRecipe")
         .and_then(serde_json::Value::as_str)
@@ -796,9 +819,10 @@ fn recipe_catalog_entry(path: &Path) -> Result<Option<RecipeCatalogEntry>, AutoP
         .collect::<Vec<_>>();
     if !valid_catalog_text(&identifier) || parents.iter().any(|parent| !valid_catalog_text(parent))
     {
-        return Ok(None);
+        return None;
     }
-    Ok(Some(RecipeCatalogEntry {
+    Some(RecipeCatalogEntry {
+        import_sources: None,
         identifier,
         builder: "autopkg".to_owned(),
         parents,
@@ -806,13 +830,14 @@ fn recipe_catalog_entry(path: &Path) -> Result<Option<RecipeCatalogEntry>, AutoP
             Capability::new("builder.autopkg").expect("static capability is valid"),
             Capability::new("os.macos").expect("static capability is valid"),
         ]),
-    }))
+    })
 }
 
 fn valid_catalog_text(value: &str) -> bool {
-    value.trim() == value
-        && (1..=2_048).contains(&value.len())
-        && !value.chars().any(char::is_control)
+    (1..=MAX_ENTRYPOINT_BYTES).contains(&value.len())
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
 struct IsolationDirectories {
@@ -978,6 +1003,7 @@ async fn read_and_enrich_report(
         serde_json::json!({
             "recipe_trust_succeeded": true,
             "recipe_trust_method": trust_method.as_str(),
+            "outputs": final_receipt_outputs(&receipts),
             "receipts": receipts,
         }),
     );
@@ -993,6 +1019,24 @@ async fn read_and_enrich_report(
         return Err(AutoPkgError::InvalidReport);
     }
     Ok(report)
+}
+
+// A single isolated run has one receipt. Multiple receipts are ambiguous and deliberately
+// provide no normalized outputs; explicit reviewed receipt selectors remain available.
+fn final_receipt_outputs(receipts: &[serde_json::Value]) -> serde_json::Value {
+    let [receipt] = receipts else {
+        return serde_json::Value::Null;
+    };
+    let Some(steps) = receipt.as_array() else {
+        return serde_json::Value::Null;
+    };
+    let mut outputs = serde_json::Map::new();
+    for step in steps {
+        if let Some(values) = step.get("Output").and_then(serde_json::Value::as_object) {
+            outputs.extend(values.clone());
+        }
+    }
+    serde_json::Value::Object(outputs)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1620,6 +1664,28 @@ mod tests {
             discover_recipe_trust_method(&directories, "Override.download.recipe").unwrap(),
             RecipeTrustMethod::AutoPkgParentTrust
         );
+    }
+
+    #[test]
+    fn normalized_outputs_use_last_processor_values_and_reject_ambiguous_receipts() {
+        let receipt = serde_json::json!([
+            {"Output":{"version":"opaque old", "pathname":"cache/App.pkg"}},
+            {"Output":{"version":"opaque newer", "pkg_path":"cache/Generated.pkg"}}
+        ]);
+        let values = final_receipt_outputs(std::slice::from_ref(&receipt));
+        assert_eq!(values["version"], "opaque newer");
+        assert_eq!(values["pathname"], "cache/App.pkg");
+        assert!(final_receipt_outputs(&[]).is_null());
+        assert!(final_receipt_outputs(&[receipt.clone(), receipt]).is_null());
+    }
+
+    #[test]
+    fn catalog_recipe_reads_enforce_the_limit_independently_of_metadata() {
+        let temporary = tempfile::tempdir().unwrap();
+        let path = temporary.path().join("oversized.recipe");
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_RECIPE_FILE_BYTES + 1).unwrap();
+        assert!(read_catalog_recipe(&path).is_err());
     }
 
     #[test]

@@ -4,6 +4,33 @@ The control plane owns durable policy, the supported Rust client owns the public
 the CLI owns terminal operations, and `../stabbur-frontend` owns the independent management console.
 The console logs in with the same Stabbur account as the CLI through its server-side session backend.
 
+## From installation to first delivery
+
+1. Choose the [local macOS test installer](operations/macos-test-setup.md) or the
+   [Linux server and macOS worker deployment](operations/linux-server-macos-worker.md). Complete
+   first-administrator bootstrap, then sign into the CLI and console with that account.
+2. Check `stabbur status` and `stabbur worker list`. In the console, inspect Workers. Confirm that
+   the intended worker is enabled, recently observed, and advertises the capabilities required
+   by the exact recipe revision. A successful login does not establish worker readiness.
+3. Add software and a reviewed recipe revision, or review and apply a catalog plan. Open the
+   software page and choose **Add build target**. Select the software, recipe and exact revision.
+   Start with a manual schedule. New console targets default to disabled.
+4. Review and enable the target, then select **Build now**. The console opens the run's progress,
+   replayed logs and verification result. The CLI equivalent is
+   `stabbur target trigger NAME --idempotency-key UNIQUE_KEY --watch`.
+5. Follow **Review resulting release**. Check the exact version, verification evidence and
+   platform variants, then promote to testing. The promotion preview shows the current and
+   proposed channel selections. Validate installation and detection on a test device before
+   promoting to stable.
+6. Resolve or export the stable installer using the reviewed delivery workflow below. Browser
+   publication alone does not install software on a device or update an existing Munki export.
+
+Resource pages have shareable fragment URLs. Refresh and Back retain the selected resource.
+Search and status filters apply to the items loaded in the current view; **Load more** extends
+that set. Build targets show their own run history; global runs show software names and full IDs.
+The console follows durable logs in bounded pages and can pause or resume updates. CLI watches
+remain the preferred option for unattended operation and exact exit-status handling.
+
 ## Review and apply a catalog
 
 Schema 2 adds build targets to managed software and immutable recipe revisions. Target references
@@ -46,12 +73,16 @@ new parent trust automatically. See [AutoPkg parent trust guidance](https://gith
 
 - `stabbur software status <slug>` shows publication and execution observations.
 - `stabbur status` reports durable queue counts, oldest queued work, and draining workers.
+  Failed jobs and expired attempts are historical totals, not counts of unresolved incidents.
 - `stabbur worker drain <id> --revision <current>` pauses new claims while current work completes.
   `worker resume` re-enables claims. Disabling invalidates active attempts instead.
 - `stabbur release withdraw <id> --revision <current> --reason 'Confirmed regression'` removes
   publication eligibility while retaining the stage reached and immutable historical evidence.
 - List commands preserve `{items,next_cursor}` in JSON. `--all` follows cursors. Human output tells
   the operator when another page exists.
+- Interactive CLI promotion reads the channel's revision when it is omitted. Automation retains
+  revision 0 as the default for channel creation; use an explicit `--revision` or opt into
+  `--current-revision`. Both still submit a concurrency precondition and reject stale state.
 - Run waits/watches accept `--timeout-seconds`. Success exits 0, failed runs 2, cancelled runs 3,
   deadline expiry 124, and transport/protocol failures 1. Watch reconnects with the last delivered
   event sequence and suppresses replayed logs. EOF does not establish success.
@@ -104,3 +135,59 @@ and checks a disposable local server, the independent client consumer, CLI pagin
 schema 2, and console auth/origin/CSRF/roles/logout/revocation. The CI workflow checks these development
 revisions together and records their exact commits. Repository publication and immutable server-image
 acceptance remain separate release gates; local success is not a released compatibility claim.
+With the dependencies in `scripts/requirements-e2e.txt` and Chromium installed, add `--browser`
+to exercise form errors, edit/refresh, navigation, catalog review, named target creation, paginated
+logs, publication, stale promotion, session expiry, literal text rendering and mobile reflow. The
+publication fixture uses synthetic bytes through the leased worker protocol; actual AutoPkg builds
+and installation remain covered by the separate macOS acceptance workflow.
+
+## Discover and import AutoPkg recipes
+
+Open **Recipes → Import recipes** (also available from Workers). Choose a worker inventory,
+filter identifiers, select recipes, and review their parent relationships and exact Git sources.
+Supply software names, artifact architecture, minimum macOS when known, and the output variables.
+The default `pathname` selects a downloaded installer; use `pkg_path` for a generated package.
+The version variable defaults to `version`. Confirm these against the recipe before building.
+
+**Review import plan** shows the proposed software, immutable recipe revisions and targets.
+Review the source pins, selectors and any existing resources the plan would update before applying.
+Every imported target starts disabled with a manual schedule. Parent trust is never accepted by
+importing, and no build is queued. Review the recipe's verification policy before enabling a target.
+A recipe with parents but no trust information should first get a committed, reviewed AutoPkg override.
+
+Enable local discovery on the worker account that owns the AutoPkg profile:
+
+```sh
+stabbur-server worker --server-url https://stabbur.example.net \
+  --token-file /path/to/worker-credential.json --data-dir /path/to/private-worker-state \
+  --discover-autopkg
+```
+
+Optionally add `--autopkg-prefs /path/to/preferences.plist`. The equivalent environment variables
+are `STABBUR_DISCOVER_AUTOPKG=true` and `STABBUR_AUTOPKG_PREFS`. Discovery runs after registration
+and every five minutes while idle, using `autopkg list-recipes --plist --show-all`. Builds remain
+isolated from that account's ambient preferences. A worker busy building publishes its next
+observation after finishing the build. Refresh discovery in the console to see published snapshots.
+
+Discovery only reads recipes and Git metadata. It does not run recipes, update repositories,
+accept trust, or upload local paths or Input values. Committed overrides keep their original
+contents in pinned Git sources, along with their parent repository pins. Recipes must be tracked
+and unchanged in clean repositories with credential-free HTTPS origins. Publish those exact
+commits so other workers can fetch them. Local-only, dirty, or untracked overrides remain visible
+with an import blocker. Duplicate identifiers, missing parents, cycles, conflicting source pins,
+and external processor dependencies also require attention. External processors currently need a
+manually reviewed catalog manifest with their complete source dependencies.
+
+To discover recipes without a configured local AutoPkg inventory, expand **Import from a repository
+URL**, enter an HTTPS URL and a full lowercase 40-character commit, and request a scan. An available
+AutoPkg worker performs the scan. Use **Check scan** to open the completed snapshot. Cross-repository
+parents require a worker inventory containing those parent repositories, or a manually reviewed
+catalog manifest. Older snapshots without import source closures must be refreshed by an updated worker.
+
+Snapshots and history are immutable and publication is idempotent. Discovery is bounded to 60 seconds
+per worker cycle, 8 MiB of local AutoPkg listing output and 1 MiB per published manifest. Discovery
+failure does not prevent the worker from claiming builds; the worker retries on the next cycle.
+
+Imported selectors use `/stabbur/outputs/<variable>`, the final value of each output variable across
+one isolated run receipt. Ambiguous multiple receipts provide no normalized outputs and the build
+fails validation instead of guessing an installer. Existing explicit receipt selectors remain supported.

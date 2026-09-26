@@ -1,6 +1,6 @@
-# Remaining v0.1 release work
+# Remaining v0.0.1 release work
 
-The server v0.1 feature surface is implemented, including desired build targets, scheduling,
+The server v0.0.1 feature surface is implemented, including desired build targets, scheduling,
 worker-observed recipe catalogs, and durable server-requested scans. The independently versioned
 public client and CLI now ingest the 75-operation contract locally. Remaining release work is
 immutable publication and cross-platform CI evidence for all four repositories.
@@ -40,7 +40,7 @@ with owner-only credentials, stable JSON and human tables, confirmations, live l
 resumable downloads. Its CI defines stable/beta/nightly builds on Linux, macOS, and Windows plus
 static release targets and checksums. Before publishing it:
 
-- replace the local exact client checkout with the released `stabbur_client` 0.1.0 tag/crate;
+- replace the local exact client checkout with the released `stabbur_client` 0.0.1 tag/crate;
 - pass the configured platform, MSRV, package, and supply-chain jobs; and
 - exercise the full CLI workflow against the same immutable server image used by the client.
 

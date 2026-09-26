@@ -5,7 +5,7 @@ Neither backend may change software, release, variant, channel, or artifact iden
 
 ## Relational persistence
 
-SQLite is the v0.1 default and the required single-host backend. It uses WAL, foreign keys,
+SQLite is the v0.0.1 default and the required single-host backend. It uses WAL, foreign keys,
 embedded migrations, a bounded busy timeout, and short write transactions. It is deliberately
 available without another service so `stabbur-server all` remains a useful small deployment.
 

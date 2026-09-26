@@ -202,6 +202,7 @@ pub async fn run_outbound_worker(
     data_dir: &Path,
     autopkg_program: Option<&Path>,
     catalog_manifest: Option<&Path>,
+    autopkg_discovery: Option<Option<&Path>>,
 ) -> Result<()> {
     let base = reqwest::Url::parse(server_url).context("parsing STABBUR_SERVER_URL")?;
     if !matches!(base.scheme(), "http" | "https")
@@ -229,6 +230,9 @@ pub async fn run_outbound_worker(
     }
     create_private_directory(data_dir).await?;
     let autopkg_program = resolve_autopkg_program(autopkg_program).await?;
+    if autopkg_discovery.is_some() && autopkg_program.is_none() {
+        bail!("AutoPkg discovery requires an available local AutoPkg installation");
+    }
     let capabilities = detected_worker_capabilities(autopkg_program.as_deref()).await;
     let capabilities = capabilities
         .iter()
@@ -247,6 +251,7 @@ pub async fn run_outbound_worker(
     let base = server_url.trim_end_matches('/').to_owned();
     info!(worker_id = %credential.worker_id, server = %base, "starting outbound Stabbur worker");
     let mut catalog_published = false;
+    let mut next_discovery = tokio::time::Instant::now();
 
     loop {
         let cycle = outbound_cycle(
@@ -258,6 +263,8 @@ pub async fn run_outbound_worker(
             autopkg_program.as_deref(),
             catalog_manifest.as_ref(),
             &mut catalog_published,
+            autopkg_discovery,
+            &mut next_discovery,
         );
         tokio::select! {
             result = cycle => {
@@ -286,6 +293,8 @@ async fn outbound_cycle(
     autopkg_program: Option<&Path>,
     catalog_manifest: Option<&RecipeCatalogManifest>,
     catalog_published: &mut bool,
+    autopkg_discovery: Option<Option<&Path>>,
+    next_discovery: &mut tokio::time::Instant,
 ) -> Result<()> {
     let worker_id = credential.worker_id;
     let response = client
@@ -311,6 +320,36 @@ async fn outbound_cycle(
             .context("publishing worker recipe catalog")?;
         worker_response(response, "worker recipe catalog publication").await?;
         *catalog_published = true;
+    }
+    if tokio::time::Instant::now() >= *next_discovery
+        && let (Some(prefs), Some(program)) = (autopkg_discovery, autopkg_program)
+    {
+        *next_discovery = tokio::time::Instant::now() + std::time::Duration::from_secs(300);
+        let identity = format!("stabbur-worker:{worker_id}:autopkg");
+        let discovered = tokio::time::timeout(
+            std::time::Duration::from_secs(60),
+            stabbur_builder_autopkg::discover_autopkg_catalog(program, prefs, &identity),
+        )
+        .await;
+        if let Ok(Ok(manifest)) = discovered {
+            let publication = client
+                .post(format!(
+                    "{base}/api/v1/internal/workers/{worker_id}/recipe-catalogs"
+                ))
+                .bearer_auth(&credential.token)
+                .json(&manifest)
+                .send()
+                .await;
+            if !publication.is_ok_and(|response| response.status().is_success()) {
+                warn!(
+                    "AutoPkg inventory publication failed; will retry on the next discovery cycle"
+                );
+            }
+        } else {
+            warn!(
+                "AutoPkg inventory discovery failed; verify the local profile and discovery limits"
+            );
+        }
     }
     let response = client
         .post(format!("{base}/api/v1/internal/workers/{worker_id}/claim"))

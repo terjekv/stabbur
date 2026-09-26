@@ -18,6 +18,9 @@ python3 scripts/install-test-macos.py install
 
 The default prefix is `~/Library/Application Support/Stabbur Test`, the API listens on
 `http://127.0.0.1:8080`, and the management UI is at `http://127.0.0.1:3000`.
+Open the exact Management UI address printed by the installer, including its hostname and port.
+If login fails after replacing `127.0.0.1` with `localhost`, return to the printed address: those
+are different browser origins, and the console requires its configured origin for sign-in.
 The installer reports the location of an owner-only file containing a randomly generated
 administrator password. Read that file locally and sign in as `admin`; the password is never
 printed by the installer. Alternatively supply `--username` and an owner-only `--password-file`.
@@ -32,6 +35,19 @@ binary SHA-256 digests. Debug builds are the default for testing; use `--build-p
 for optimized binaries. Builds can take several minutes and require several gigabytes of disk.
 
 ## Choose directories and ports
+
+Pass port options **after `install`**. For example, if the default ports are occupied:
+
+```sh
+python3 scripts/install-test-macos.py --prefix /tmp/stabbur install \
+  --api-port 18080 --web-port 13000
+```
+
+The API will use `http://127.0.0.1:18080` and the UI `http://127.0.0.1:13000`.
+Choose two different available ports between 1024 and 65535. Both values are saved with the
+installation and reused by `start` and `restart`.
+Run `python3 scripts/install-test-macos.py --help` to see global and installation options,
+or `python3 scripts/install-test-macos.py install --help` for installation options alone.
 
 Every destination must be a **new directory**. The installer refuses existing files, directories,
 symlinks, overlapping destinations and unsafe parents. It never changes permissions on an existing

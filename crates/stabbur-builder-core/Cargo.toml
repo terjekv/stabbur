@@ -13,8 +13,8 @@ hex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-stabbur-domain = { version = "0.1.0", path = "../stabbur-domain" }
-stabbur-jobs-core = { version = "0.1.0", path = "../stabbur-jobs-core" }
+stabbur-domain = { version = "0.0.1", path = "../stabbur-domain" }
+stabbur-jobs-core = { version = "0.0.1", path = "../stabbur-jobs-core" }
 thiserror.workspace = true
 
 [lints]
