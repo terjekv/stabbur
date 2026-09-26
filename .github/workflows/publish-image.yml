@@ -18,8 +18,30 @@ concurrency:
   group: publish-server-image
   cancel-in-progress: false
 jobs:
-  publish:
+  release-needed:
     if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_sha == github.sha &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      needed: ${{ steps.release.outputs.needed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Preserve already published versions
+        id: release
+        run: python3 scripts/publish-server-release.py --check-needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+  publish:
+    needs: release-needed
+    if: >-
+      needs.release-needed.outputs.needed == 'true' &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' &&

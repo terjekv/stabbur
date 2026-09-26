@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "stabbur": "d3a64710d608e19a14c4bb360bffe18e343bd7a6",
+    "stabbur-client-rust": "e31e621f6eee771aa47a5d95d6bff83993e413b5",
+    "stabbur-cli": "63699eee8639c1380181093c8716c04884322920",
+    "stabbur-frontend": "028d664e4e0544c0e41b553ae11454f92ad2dc1a"
+  },
+  "ci_runs": {
+    "stabbur": "https://github.com/terjekv/stabbur/actions/runs/36231299691",
+    "stabbur-client-rust": "https://github.com/terjekv/stabbur-client-rust/actions/runs/36230461212",
+    "stabbur-cli": "https://github.com/terjekv/stabbur-cli/actions/runs/36230524154",
+    "stabbur-frontend": "https://github.com/terjekv/stabbur-frontend/actions/runs/36230555393"
+  },
+  "acceptance_run": "https://github.com/terjekv/stabbur/actions/runs/36231299162",
+  "image": "ghcr.io/terjekv/stabbur-server@sha256:41aba0e2051de7d74df09a6e57487a4e1755706d587aca54603167953fd0748d",
+  "platform": "linux/amd64",
+  "client_compatibility": "passed",
+  "cli_compatibility": "passed",
+  "console_compatibility": "passed",
+  "server_tag": "v0.0.1",
+  "publication_run": "https://github.com/terjekv/stabbur/actions/runs/36231611736",
+  "openapi_sha256": "4a979bb27b5e4651320f87d7345995bd24868aa2a0cb9a072936f70dffda4901"
+}

@@ -57,7 +57,7 @@ The supported Rust client, user-facing `stabbur` CLI, and optional browser manag
 are implemented in independent, independently versioned repositories. The console supports
 software, build, release, and publication workflows alongside the CLI. Their release status does
 not change the server API contract; see
-[compatibility](COMPATIBILITY.md) and the [remaining release work](docs/spec-gap-analysis.md).
+[compatibility](COMPATIBILITY.md) and the [post-release priorities](docs/spec-gap-analysis.md).
 
 ## Management console and operator workflows
 

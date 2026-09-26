@@ -7,10 +7,10 @@ on:
     inputs:
       client_ref:
         description: Client commit or branch for coordinated review
-        default: e31e621f6eee771aa47a5d95d6bff83993e413b5
+        default: 802b60e653b75b3694b0ed4607a6f61a139ba093
       cli_ref:
         description: CLI commit or branch for coordinated review
-        default: 63699eee8639c1380181093c8716c04884322920
+        default: 7e498ec5c9f3f6532404934cb06449b1712887e4
       frontend_ref:
         description: Console commit or branch for coordinated review
         default: 028d664e4e0544c0e41b553ae11454f92ad2dc1a
@@ -39,13 +39,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-client-rust
-          ref: ${{ inputs.client_ref || 'e31e621f6eee771aa47a5d95d6bff83993e413b5' }}
+          ref: ${{ inputs.client_ref || '802b60e653b75b3694b0ed4607a6f61a139ba093' }}
           path: stabbur-client-rust
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-cli
-          ref: ${{ inputs.cli_ref || '63699eee8639c1380181093c8716c04884322920' }}
+          ref: ${{ inputs.cli_ref || '7e498ec5c9f3f6532404934cb06449b1712887e4' }}
           path: stabbur-cli
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

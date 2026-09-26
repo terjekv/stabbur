@@ -2,7 +2,9 @@
 """Publication evidence must reject stale or incomplete acceptance."""
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -16,6 +18,19 @@ SHA = 'a' * 40
 
 
 class PublicationEvidenceTests(unittest.TestCase):
+    def test_released_versions_skip_publication_and_lookup_failures_stop(self):
+        for response, expected in [
+                (subprocess.CompletedProcess([], 1, '', 'HTTP 404'), True),
+                (subprocess.CompletedProcess([], 0, json.dumps({'tag_name': 'v0.0.1', 'draft': False}), ''), False)]:
+            with patch.object(release.subprocess, 'run', return_value=response):
+                self.assertEqual(release.release_needed('v0.0.1'), expected)
+        for response, error in [
+                (subprocess.CompletedProcess([], 1, '', 'HTTP 403'), RuntimeError),
+                (subprocess.CompletedProcess([], 0, json.dumps({'tag_name': 'v0.0.1', 'draft': True}), ''), ValueError),
+                (subprocess.CompletedProcess([], 0, json.dumps({'tag_name': 'v0.0.2', 'draft': False}), ''), ValueError)]:
+            with patch.object(release.subprocess, 'run', return_value=response), self.assertRaises(error):
+                release.release_needed('v0.0.1')
+
     def report(self):
         return {'schema_version': 1, 'result': 'passed', 'stage': 'complete',
                 'installation_requested': True,

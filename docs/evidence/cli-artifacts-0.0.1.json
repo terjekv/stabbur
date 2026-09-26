@@ -1,0 +1,30 @@
+{
+  "release": "https://github.com/terjekv/stabbur-cli/releases/tag/v0.0.1",
+  "source": "7e498ec5c9f3f6532404934cb06449b1712887e4",
+  "artifacts": [
+    {
+      "name": "stabbur-linux-x86_64-musl-v0.0.1.tar.gz",
+      "sha256": "638d1872c7561c44d71f6deaac4b21f9ede8434c86264eabc32ca5c8626d5225",
+      "bytes": 1726994,
+      "url": "https://github.com/terjekv/stabbur-cli/releases/download/v0.0.1/stabbur-linux-x86_64-musl-v0.0.1.tar.gz"
+    },
+    {
+      "name": "stabbur-linux-aarch64-musl-v0.0.1.tar.gz",
+      "sha256": "a40e7dfccdb64778dced859c745b41f24b6e4b123308359eddf0c2aeff4b8c4f",
+      "bytes": 1644914,
+      "url": "https://github.com/terjekv/stabbur-cli/releases/download/v0.0.1/stabbur-linux-aarch64-musl-v0.0.1.tar.gz"
+    },
+    {
+      "name": "stabbur-macos-aarch64-v0.0.1.tar.gz",
+      "sha256": "e6df810091311d52ad7e92173d9ada045cc202ff7bd9d596de5864d49d486953",
+      "bytes": 1467934,
+      "url": "https://github.com/terjekv/stabbur-cli/releases/download/v0.0.1/stabbur-macos-aarch64-v0.0.1.tar.gz"
+    },
+    {
+      "name": "stabbur-windows-x86_64-v0.0.1.zip",
+      "sha256": "1f106209c81232e3a30ee2b4c3a8eb1baa33cf82345e5f586e2fac7d7c238355",
+      "bytes": 1552358,
+      "url": "https://github.com/terjekv/stabbur-cli/releases/download/v0.0.1/stabbur-windows-x86_64-v0.0.1.zip"
+    }
+  ]
+}
