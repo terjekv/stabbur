@@ -77,6 +77,9 @@ impl From<RecipeImportSources> for Vec<RecipeCatalogSource> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecipeCatalogEntry {
+    /// Observed presentation hints, absent in older snapshots; never an execution safety proof.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guidance: Option<RecipeCatalogGuidance>,
     /// Complete pinned source closure, absent when discovery cannot prove reproducibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub import_sources: Option<RecipeImportSources>,
@@ -89,6 +92,62 @@ pub struct RecipeCatalogEntry {
     pub parents: Vec<String>,
     /// Capabilities required to execute this recipe.
     pub required_capabilities: CapabilitySet,
+}
+
+/// Observed intent of a recipe's processing chain, independent of its filename.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecipePurpose {
+    /// Fetch a vendor-provided artifact.
+    FetchArtifact,
+    /// Produce or copy a package for later distribution.
+    BuildArtifact,
+    /// Install software on the executing worker.
+    Install,
+    /// Publish directly into another distribution system.
+    Publish,
+    /// Discovery cannot determine the outcome.
+    Unknown,
+}
+
+/// Bounded display metadata. Purpose is an observation, not authorization or verification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "RecipeCatalogGuidanceWire")]
+pub struct RecipeCatalogGuidance {
+    name: String,
+    purpose: RecipePurpose,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecipeCatalogGuidanceWire {
+    name: String,
+    purpose: RecipePurpose,
+}
+
+impl RecipeCatalogGuidance {
+    /// Constructs bounded metadata without control characters.
+    pub fn new(name: String, purpose: RecipePurpose) -> Result<Self, RecipeCatalogError> {
+        validate_catalog_text(&name)?;
+        Ok(Self { name, purpose })
+    }
+
+    /// Human-readable software name observed in the source.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Observed processing intent.
+    pub const fn purpose(&self) -> RecipePurpose {
+        self.purpose
+    }
+}
+
+impl TryFrom<RecipeCatalogGuidanceWire> for RecipeCatalogGuidance {
+    type Error = RecipeCatalogError;
+    fn try_from(value: RecipeCatalogGuidanceWire) -> Result<Self, Self::Error> {
+        Self::new(value.name, value.purpose)
+    }
 }
 
 /// Severity of one catalog validation diagnostic.
@@ -636,6 +695,30 @@ impl BuildResult {
 mod tests {
     use super::*;
 
+    #[test]
+    fn display_guidance_validates_deserialization_and_legacy_manifests_remain_stable() {
+        assert!(
+            serde_json::from_value::<RecipeCatalogGuidance>(
+                serde_json::json!({"name":"bad\nname","purpose":"fetch_artifact"})
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_value::<RecipeCatalogGuidance>(
+                serde_json::json!({"name":"App","purpose":"surprise"})
+            )
+            .is_err()
+        );
+        let original = catalog_manifest();
+        let json = serde_json::to_value(&original).unwrap();
+        assert!(json["recipes"][0].get("guidance").is_none());
+        let restored: RecipeCatalogManifest = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            original.canonical_digest().unwrap(),
+            restored.canonical_digest().unwrap()
+        );
+    }
+
     fn catalog_manifest() -> RecipeCatalogManifest {
         RecipeCatalogManifest {
             schema_version: RecipeCatalogManifest::SCHEMA_VERSION,
@@ -645,6 +728,7 @@ mod tests {
                 revision: "a".repeat(40),
             },
             recipes: vec![RecipeCatalogEntry {
+                guidance: None,
                 import_sources: None,
                 identifier: "com.example.firefox".into(),
                 builder: "autopkg".into(),

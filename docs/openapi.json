@@ -4903,6 +4903,17 @@
             "type": "string",
             "description": "Stable builder adapter selector."
           },
+          "guidance": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecipeCatalogGuidanceResponse",
+                "description": "Observed display hints, never a safety or readiness guarantee. Absent in legacy snapshots."
+              }
+            ]
+          },
           "identifier": {
             "type": "string",
             "description": "Builder-owned stable identifier or entrypoint."
@@ -4930,6 +4941,24 @@
               "type": "string"
             },
             "description": "Capabilities required to execute this recipe."
+          }
+        }
+      },
+      "RecipeCatalogGuidanceResponse": {
+        "type": "object",
+        "description": "Bounded recipe display metadata observed by a worker.",
+        "required": [
+          "name",
+          "purpose"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name derived from the recipe filename, never its input values."
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/RecipePurposeResponse",
+            "description": "Observed processing intent across the parent chain."
           }
         }
       },
@@ -5311,6 +5340,17 @@
             "description": "Opaque next cursor."
           }
         }
+      },
+      "RecipePurposeResponse": {
+        "type": "string",
+        "description": "Observed recipe intent; custom processors may have additional effects.",
+        "enum": [
+          "fetch_artifact",
+          "build_artifact",
+          "install",
+          "publish",
+          "unknown"
+        ]
       },
       "RecipeResponse": {
         "type": "object",

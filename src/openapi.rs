@@ -154,6 +154,8 @@ use crate::{
         api::RecipeRevisionList,
         api::RecipeCatalogSourceResponse,
         api::RecipeCatalogEntryResponse,
+        api::RecipeCatalogGuidanceResponse,
+        api::RecipePurposeResponse,
         api::RecipeCatalogDiagnosticSeverityResponse,
         api::RecipeCatalogDiagnosticResponse,
         api::RecipeCatalogManifestResponse,

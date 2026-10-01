@@ -177,6 +177,14 @@ Portable safety tests run in the normal static CI job:
 python3 scripts/test-macos-test-setup.py
 ```
 
+CI also exercises the default source-fetch path using the installer's exact companion pins. This
+checks all three API contracts against this server checkout before any compilation or service
+startup, including when the live installer tests use prebuilt binaries:
+
+```sh
+python3 scripts/test-macos-test-setup.py --source-contracts
+```
+
 The cross-repository macOS job also exercises a real installation using its compiled binaries and
 prepared AutoPkg. It verifies unusual/custom paths, private credentials, CLI and frontend login,
 worker registration, durable state across restart, repeated start/stop, and occupied-port refusal.
@@ -191,3 +199,14 @@ python3 scripts/test-macos-test-setup.py --live \
 ```
 
 Add `--autopkg /absolute/path/to/autopkg` to require and verify its worker capability too.
+
+For coordinated, unpublished onboarding changes, use the four sibling checkouts explicitly:
+
+```sh
+./scripts/install-test-macos.py --prefix /tmp/stabbur-onboarding install \
+  --workspace /path/to/workspace --web-port 3334 --api-port 9091
+```
+
+The installer validates the three API documents before building. Default companion pins must be
+updated together when these changes are published; an old frontend/client contract must never be
+accepted silently. The UI’s Firefox starter source supports a scan without local AutoPkg discovery.

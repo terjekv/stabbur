@@ -956,6 +956,7 @@ async fn assert_recipe_catalog_contract(
         },
         recipes: vec![
             RecipeCatalogEntry {
+                guidance: None,
                 import_sources: None,
                 identifier: "com.example.alpha".into(),
                 builder: "contract-run".into(),
@@ -963,6 +964,7 @@ async fn assert_recipe_catalog_contract(
                 required_capabilities: capabilities.clone(),
             },
             RecipeCatalogEntry {
+                guidance: None,
                 import_sources: None,
                 identifier: "com.example.beta".into(),
                 builder: "contract-run".into(),
@@ -1155,6 +1157,7 @@ async fn assert_recipe_catalog_scan_contract(
         producer: "contract-run".into(),
         source,
         recipes: vec![RecipeCatalogEntry {
+            guidance: None,
             import_sources: None,
             identifier: "com.example.scanned".into(),
             builder: "contract-run".into(),

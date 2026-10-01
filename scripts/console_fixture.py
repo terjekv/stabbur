@@ -37,10 +37,10 @@ def publish_fixture(origin, authorization, http):
     catalog = {'schema_version':1, 'producer':'autopkg',
         'source':{'locator':'stabbur-worker:' + credential['worker_id'] + ':autopkg', 'revision':'browser-fixture'},
         'recipes':[
-            {'identifier':'example.download.ImportedApp','builder':'autopkg','parents':[],
+            {'identifier':'example.download.ImportedApp','guidance':{'name':'ImportedApp','purpose':'fetch_artifact'},'builder':'autopkg','parents':[],
              'required_capabilities':['builder.autopkg','os.macos'],
              'import_sources':[{'locator':pin['url'],'revision':pin['commit']}]},
-            {'identifier':'example.override.Uncommitted','builder':'autopkg','parents':['example.download.ImportedApp'],
+            {'identifier':'example.override.Uncommitted','guidance':{'name':'Uncommitted','purpose':'fetch_artifact'},'builder':'autopkg','parents':['example.download.ImportedApp'],
              'required_capabilities':['builder.autopkg','os.macos']}],
         'diagnostics':[{'identifier':'example.override.Uncommitted','code':'unpinned_source','severity':'error',
                         'detail':'Commit and publish this override before importing.'}]}

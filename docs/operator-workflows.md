@@ -143,17 +143,26 @@ and installation remain covered by the separate macOS acceptance workflow.
 
 ## Discover and import AutoPkg recipes
 
-Open **Recipes → Import recipes** (also available from Workers). Choose a worker inventory,
-filter identifiers, select recipes, and review their parent relationships and exact Git sources.
-Supply software names, artifact architecture, minimum macOS when known, and the output variables.
-The default `pathname` selects a downloaded installer; use `pkg_path` for a generated package.
-The version variable defaults to `version`. Confirm these against the recipe before building.
+Open **Add software from recipes**. Choose an inventory, or use **Firefox starter source** and scan
+its displayed exact commit. Scan progress refreshes automatically. The picker groups recipes by
+software and shows Recommended, Artifact recipes, Needs setup, and All discovered views. Purpose is
+observed from known processors across the parent chain; it is neither a suffix guess nor an execution
+safety guarantee. Install and publish workflows are excluded from guided artifact import.
 
-**Review import plan** shows the proposed software, immutable recipe revisions and targets.
-Review the source pins, selectors and any existing resources the plan would update before applying.
-Every imported target starts disabled with a manual schedule. Parent trust is never accepted by
-importing, and no build is queued. Review the recipe's verification policy before enabling a target.
-A recipe with parents but no trust information should first get a committed, reviewed AutoPkg override.
+Configure each selected installer separately. Confirm architecture from the artifact, not the worker,
+and supply its version and installer output variables. The exact pinned FirefoxSignedPkg preset
+suggests `version` and `pathname`; other recipes require reviewed mappings. Old snapshots without
+purpose metadata remain readable but must be rescanned for guided import. Parent trust requirements,
+missing dependencies and incomplete source closures prevent guided import in both UI and client.
+
+**Review sources and import plan** shows software, immutable recipe revisions and disabled manual
+targets. Inspect every source pin, selector and existing resource being updated before applying.
+Review and enable a target, build once, inspect its artifact and verification results, then promote
+or schedule. A failed trust check is shown above the run logs. Log streams are reconstructed separately
+per attempt so partial stderr and stdout chunks cannot corrupt one another's messages.
+
+A recipe with parents but no trust information first needs a reviewed AutoPkg override committed
+and published at an exact revision. Import never accepts trust or queues a build automatically.
 
 Enable local discovery on the worker account that owns the AutoPkg profile:
 
@@ -178,9 +187,8 @@ with an import blocker. Duplicate identifiers, missing parents, cycles, conflict
 and external processor dependencies also require attention. External processors currently need a
 manually reviewed catalog manifest with their complete source dependencies.
 
-To discover recipes without a configured local AutoPkg inventory, expand **Import from a repository
-URL**, enter an HTTPS URL and a full lowercase 40-character commit, and request a scan. An available
-AutoPkg worker performs the scan. Use **Check scan** to open the completed snapshot. Cross-repository
+To discover recipes without a configured local AutoPkg inventory, expand **Scan a recipe repository**, enter an HTTPS URL and a full lowercase 40-character commit, and request a scan. An available
+AutoPkg worker performs the scan. The console opens the completed snapshot automatically. Cross-repository
 parents require a worker inventory containing those parent repositories, or a manually reviewed
 catalog manifest. Older snapshots without import source closures must be refreshed by an updated worker.
 

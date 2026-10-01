@@ -31,9 +31,9 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
 COMPANIONS = {
-    'stabbur-client-rust': 'b6754e85505388b82cd76a053b73b0956549ee5e',
-    'stabbur-cli': '36ec320fd4ebd643431c663d3af277dc11060300',
-    'stabbur-frontend': '418e09a53956cdd97d4b3f7ec40163520f60dd8a',
+    'stabbur-client-rust': '9d088c263c843d6fc71524acba2cb31b075d5280',
+    'stabbur-cli': '7e498ec5c9f3f6532404934cb06449b1712887e4',
+    'stabbur-frontend': '2a1e083ce3030373f4026df4e4f5904595ac70be',
 }
 COMPONENTS = ('server', 'worker', 'frontend')
 SAFE_PATH = '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin'
@@ -357,6 +357,41 @@ def locked(prefix):
         yield
 
 
+def validate_contracts(checkouts):
+    server = json.loads((checkouts['stabbur'] / 'docs/openapi.json').read_text())
+    mismatched = [name for name, relative in (
+        ('stabbur-client-rust', 'openapi/openapi.json'),
+        ('stabbur-frontend', 'contract/openapi.json'))
+        if json.loads((checkouts[name] / relative).read_text()) != server]
+    if mismatched:
+        raise SetupError('API contracts differ from this server checkout: ' + ', '.join(mismatched)
+                         + '. Use companion revisions validated with this server.')
+
+
+def prepare_sources(workspace, sources, env, log):
+    """Fetch exact companion revisions and validate contracts before any compilation."""
+    if workspace:
+        workspace = path_value(workspace).resolve(strict=True)
+        checkouts = {name: workspace / name for name in ('stabbur', *COMPANIONS)}
+    else:
+        checkouts = {'stabbur': ROOT}
+        for name, revision in COMPANIONS.items():
+            destination = sources / name
+            print(f'Fetching pinned {name} sources…', flush=True)
+            command(['git', 'init', destination], env=env, log=log, label='Source initialization')
+            command(['git', '-C', destination, 'fetch', '--depth=1',
+                     f'https://github.com/terjekv/{name}.git', revision],
+                    env=env, log=log, label='Pinned source fetch', timeout=300)
+            command(['git', '-C', destination, 'checkout', '--detach', 'FETCH_HEAD'],
+                    env=env, log=log, label='Source checkout')
+            actual = command(['git', '-C', destination, 'rev-parse', 'HEAD'], env=env).decode().strip()
+            if actual != revision:
+                raise SetupError('Fetched source revision does not match its pin.')
+            checkouts[name] = destination
+    validate_contracts(checkouts)
+    return checkouts
+
+
 def build_binaries(args, sources, build, logs):
     supplied = [args.server_binary, args.cli_binary, args.frontend_binary]
     if all(supplied):
@@ -367,29 +402,7 @@ def build_binaries(args, sources, build, logs):
     env.update(CARGO_TARGET_DIR=str(build), CARGO_INCREMENTAL='0', CARGO_PROFILE_DEV_DEBUG='0',
                GIT_TERMINAL_PROMPT='0')
     with (logs / 'build.log').open('xb') as log:
-        if args.workspace:
-            workspace = path_value(args.workspace).resolve(strict=True)
-            checkouts = {name: workspace / name for name in ('stabbur', *COMPANIONS)}
-        else:
-            checkouts = {'stabbur': ROOT}
-            for name, revision in COMPANIONS.items():
-                destination = sources / name
-                print(f'Fetching pinned {name} sources…', flush=True)
-                command(['git', 'init', destination], env=env, log=log, label='Source initialization')
-                command(['git', '-C', destination, 'fetch', '--depth=1',
-                         f'https://github.com/terjekv/{name}.git', revision],
-                        env=env, log=log, label='Pinned source fetch', timeout=300)
-                command(['git', '-C', destination, 'checkout', '--detach', 'FETCH_HEAD'],
-                        env=env, log=log, label='Source checkout')
-                actual = command(['git', '-C', destination, 'rev-parse', 'HEAD'], env=env).decode().strip()
-                if actual != revision:
-                    raise SetupError('Fetched source revision does not match its pin.')
-                checkouts[name] = destination
-        contracts = [checkouts['stabbur'] / 'docs/openapi.json',
-                     checkouts['stabbur-client-rust'] / 'openapi/openapi.json',
-                     checkouts['stabbur-frontend'] / 'contract/openapi.json']
-        if not all(json.loads(path.read_text()) == json.loads(contracts[0].read_text()) for path in contracts[1:]):
-            raise SetupError('Server, client and frontend API contracts differ.')
+        checkouts = prepare_sources(args.workspace, sources, env, log)
         evidence = {}
         for name, checkout in checkouts.items():
             evidence[name] = {
