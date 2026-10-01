@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 COMPANIONS = {
     'stabbur-client-rust': '9d088c263c843d6fc71524acba2cb31b075d5280',
     'stabbur-cli': '7e498ec5c9f3f6532404934cb06449b1712887e4',
-    'stabbur-frontend': '2a1e083ce3030373f4026df4e4f5904595ac70be',
+    'stabbur-frontend': '5ee7b0d3c53a0fedd94af02fb64911c8b5c31142',
 }
 COMPONENTS = ('server', 'worker', 'frontend')
 SAFE_PATH = '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin'

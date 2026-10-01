@@ -221,6 +221,7 @@ def operator_workflows(origin, password, published_run):
         page.get_by_label('Installer output variable', exact=True).fill('pathname')
         page.get_by_role('button', name='Review sources and import plan', exact=True).click()
         page.get_by_role('heading', name='Catalog plans', exact=True).wait_for()
+        expect(page).to_have_url(re.compile(r'/#/catalog$'))
         page.get_by_text('Will be disabled', exact=False).wait_for()
         page.get_by_role('checkbox', name='I have reviewed every change, source pin and target that will be enabled.', exact=True).check()
         page.get_by_role('button', name='Apply reviewed plan', exact=True).click()
