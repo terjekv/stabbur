@@ -1,6 +1,7 @@
 """Headless browser acceptance against only a harness-owned loopback console.
 
-No saved authentication state, HAR, trace, video or credential downloads are collected.
+Authentication cookies are reused only in process memory. No state files, HAR, trace, video
+or credential downloads are collected.
 """
 import re
 from pathlib import Path
@@ -8,6 +9,9 @@ from contextlib import contextmanager
 from urllib.parse import urlsplit
 
 from playwright.sync_api import expect, sync_playwright
+
+# Sessions belong only to disposable loopback fixtures; never persist or print these values.
+_fixture_sessions = {}
 
 
 @contextmanager
@@ -17,6 +21,7 @@ def console_page(origin, password, loopback_alias=False):
         browser = playwright.chromium.launch()
         try:
             context = browser.new_context(viewport={'width': 1280, 'height': 900})
+            context.add_cookies(_fixture_sessions.get(origin, []))
             alias = origin.replace('://127.0.0.1:', '://localhost:')
             allowed = (origin + '/', alias + '/') if loopback_alias else (origin + '/',)
             context.route('**/*', lambda route: route.continue_()
@@ -31,7 +36,11 @@ def console_page(origin, password, loopback_alias=False):
                 expect(page).to_have_url(origin + '/#/software')
             else:
                 page.goto(origin)
-            login(page, password)
+            username=page.get_by_label('Username',exact=True)
+            navigation=page.get_by_role('navigation',name='Management')
+            username.or_(navigation).first.wait_for(state='visible')
+            if username.is_visible():
+                login(page,password)
             try:
                 yield page
             except Exception:
@@ -40,6 +49,7 @@ def console_page(origin, password, loopback_alias=False):
                 print('Console feedback:', page.locator('.feedback').all_text_contents())
                 raise
             assert not errors, 'browser application raised an uncaught error'
+            _fixture_sessions[origin]=context.cookies()
         finally:
             browser.close()
 
@@ -47,8 +57,10 @@ def console_page(origin, password, loopback_alias=False):
 def login(page, password):
     page.get_by_label('Username', exact=True).fill('live-admin')
     page.get_by_label('Password', exact=True).fill(password)
-    page.get_by_role('button', name='Sign in', exact=True).click()
-    expect(page.get_by_role('navigation', name='Management')).to_be_visible()
+    with page.expect_response(lambda response: response.url.endswith('/api/login')) as response:
+        page.get_by_role('button', name='Sign in', exact=True).click()
+    assert response.value.status==200, f'Fixture login returned HTTP {response.value.status}'
+    expect(page.get_by_role('navigation', name='Management')).to_be_visible(timeout=15000)
 
 
 def publish_delivery(origin, password, software, version, detection, kind, channel, tested):
@@ -328,6 +340,13 @@ def saved_export_workflow(origin, password):
         expect(dialog).not_to_be_visible(timeout=30000)
         expect(page.get_by_role('heading',name='Staff Macs',exact=True)).to_be_visible()
         expect(page.get_by_role('link',name='Download repository files',exact=True)).to_be_visible()
+        expect(page.locator('.export-published-versions')).to_contain_text('Console delivery fixture fixture-01')
+        definition_writes=[]
+        page.on('request',lambda request: definition_writes.append(True) if request.url.endswith('/api/operation/update_export') else None)
+        page.get_by_role('button',name='Preview batch',exact=True).click()
+        expect(dialog).to_contain_text('UNCHANGED')
+        assert not definition_writes, 'previewing unchanged software must not create a definition revision'
+        dialog.get_by_role('button',name='Close',exact=True).click()
         page.set_viewport_size({'width':320,'height':800})
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'),'saved export overflows at 320px'
         page.set_viewport_size({'width':1280,'height':1000})

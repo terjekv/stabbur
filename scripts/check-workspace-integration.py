@@ -162,7 +162,7 @@ def run(args):
                 require(http(console, '/api/session', opener=browser)[0], 401, 'upstream revocation')
                 print('PASS: three pinned contracts, independent client, CLI pagination/catalog v2, console login/origin/CSRF/roles/logout/revocation')
                 if args.browser:
-                    from e2e_browser import operator_workflows, saved_export_workflow
+                    from e2e_browser import operator_workflows, saved_export_workflow, console_page
                     from console_fixture import publish_fixture
                     published_run = publish_fixture(origin, authorization, http)
                     snapshots = json.loads(subprocess.check_output(command + ['catalog', 'snapshots', '--all'], env=cli_env, timeout=20))
@@ -179,6 +179,8 @@ def run(args):
                     assert json.loads(imported_file.read_text()) == desired
                     operator_workflows(console, password, published_run)
                     export_id,export_cookies=saved_export_workflow(console,password)
+                    with console_page(console,password) as reused:
+                        assert reused.context.cookies()==export_cookies, 'browser helpers must reuse the fixture session without another login'
                     saved=json.loads(subprocess.check_output(command+['exports','show',export_id],env=cli_env,timeout=20))
                     assert saved['definition']['name']=='Staff Macs' and saved['generation']==1
                     export_plan=work/'export-plan.json'
