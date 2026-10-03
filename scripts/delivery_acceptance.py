@@ -100,6 +100,8 @@ def exercise_delivery(args, work, api, gateway, console, password, first_release
         finally:
             if args.install_fixture:
                 command(['sudo', '-n', '/usr/bin/defaults', 'delete', installed_preferences.with_suffix('')])
+                # defaults clears the cached domain but may retain an empty plist.
+                command(['sudo', '-n', '/bin/rm', '-f', installed_preferences])
                 command(['sudo', '-n', '/usr/sbin/chown', '-R', str(os.getuid()), managed])
 
     def install_check(managed, software, verify):

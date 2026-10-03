@@ -230,6 +230,7 @@ def munki_cycle(args, work, export, identifier, destination):
             require(not after.get('managed_installs'), 'Munki detects installed fixture; no reinstall')
         finally:
             command(['sudo', '-n', '/usr/bin/defaults', 'delete', preferences.with_suffix('')])
+            command(['sudo', '-n', '/bin/rm', '-f', preferences])
             # Only the unique, script-generated fixture path and receipt are removed.
             command(['sudo', '-n', '/bin/rm', '-rf', destination])
             subprocess.run(['sudo', '-n', '/usr/sbin/pkgutil', '--forget', identifier], capture_output=True, timeout=30)
