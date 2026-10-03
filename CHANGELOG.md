@@ -2,6 +2,22 @@
 
 All notable changes to Stabbur server are documented here.
 
+## Unreleased
+
+### Added
+
+- Add server-side library search, attention views, query-bound keyset pagination, and aggregate
+  application summaries, with indexed SQLite reads and shared adapter conformance coverage.
+- Report queued work by capability requirements, compatible workers, and active leases.
+- Adopt application-first navigation, explicit export selections, paginated pickers, and reviewed
+  snapshot restoration in the coordinated console, with matching public client and CLI search.
+- Record measurement and policy prerequisites for notifications, ownership, retention, and
+  separately scalable storage, execution, and delivery.
+
+### Fixed
+
+- Describe export history pagination as query parameters so reviewed console requests can load it.
+
 ## [0.0.1] - 2026-09-26
 
 - Target the first coordinated release as 0.0.1.

@@ -1530,26 +1530,20 @@
           },
           {
             "name": "after",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int64",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -1852,6 +1846,101 @@
           },
           "404": {
             "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/library/software": {
+      "get": {
+        "tags": [
+          "software"
+        ],
+        "operationId": "software_library",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Literal name/slug substring; ASCII case-insensitive, at most 200 UTF-8 bytes.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "description": "all (default), attention, failed, blocked, review, or not_built.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "name (default, code-point order) or newest (creation identity descending). Never version order.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque keyset cursor bound to the search, view, and sort.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50, maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered software summaries and actionable attention",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query or cursor from a different query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Software read permission required",
             "content": {
               "application/json": {
                 "schema": {
@@ -4533,6 +4622,49 @@
         ],
         "description": "Manual or fixed-interval target schedule."
       },
+      "CapabilityQueueResponse": {
+        "type": "object",
+        "description": "Jobs grouped by exact capabilities, separating unavailable workers from active leases.",
+        "required": [
+          "required_capabilities",
+          "queued_jobs",
+          "matching_workers",
+          "workers_with_active_leases",
+          "oldest_queued_at"
+        ],
+        "properties": {
+          "matching_workers": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Recent enabled non-draining compatible workers.",
+            "minimum": 0
+          },
+          "oldest_queued_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Oldest job in this group."
+          },
+          "queued_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Queued jobs.",
+            "minimum": 0
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Complete requirements matched on one worker."
+          },
+          "workers_with_active_leases": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Compatible workers holding an unexpired lease; this is not configured capacity.",
+            "minimum": 0
+          }
+        }
+      },
       "ChangePasswordRequest": {
         "type": "object",
         "description": "Self-service password change request.",
@@ -5550,6 +5682,131 @@
           }
         }
       },
+      "LibraryEntryResponse": {
+        "type": "object",
+        "description": "Library summary with separate execution, approval, and publication observations.",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "revision",
+          "created_at",
+          "channels",
+          "outstanding_runs",
+          "blocked_targets",
+          "review_count"
+        ],
+        "properties": {
+          "blocked_targets": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Enabled targets without a recent compatible worker.",
+            "minimum": 0
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SoftwareChannelStatusResponse"
+            },
+            "description": "Current channel selections, not evidence of installation on a device."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Software creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "Software identity."
+          },
+          "last_success_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Most recent successful check."
+          },
+          "latest_run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Latest run identity."
+          },
+          "latest_run_state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Latest run state; historical failures do not overwrite later success."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "next_run_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Next enabled recurring check."
+          },
+          "outstanding_runs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Queued or running builds.",
+            "minimum": 0
+          },
+          "review_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Available candidate releases awaiting review.",
+            "minimum": 0
+          },
+          "review_release_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Most recently created available candidate."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Software concurrency revision.",
+            "minimum": 0
+          },
+          "slug": {
+            "type": "string",
+            "description": "Stable software slug."
+          }
+        }
+      },
+      "LibraryPageResponse": {
+        "type": "object",
+        "description": "A bounded library page. No false next-page cursor when the collection is exhausted.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LibraryEntryResponse"
+            },
+            "description": "Current summary rows."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Continuation for the same query; null at exhaustion."
+          }
+        }
+      },
       "LivenessResponse": {
         "type": "object",
         "description": "Liveness response.",
@@ -5609,6 +5866,8 @@
         "type": "object",
         "description": "Durable queue and worker measurements; contains no backend paths or credentials.",
         "required": [
+          "capability_queues",
+          "capability_queues_truncated",
           "queued_jobs",
           "running_jobs",
           "failed_jobs",
@@ -5616,6 +5875,17 @@
           "draining_workers"
         ],
         "properties": {
+          "capability_queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityQueueResponse"
+            },
+            "description": "First 200 queued capability groups ordered by oldest work."
+          },
+          "capability_queues_truncated": {
+            "type": "boolean",
+            "description": "Further groups exist outside this bounded response."
+          },
           "draining_workers": {
             "type": "integer",
             "format": "int64",

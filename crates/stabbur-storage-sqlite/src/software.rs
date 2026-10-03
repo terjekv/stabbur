@@ -8,6 +8,13 @@ use super::{
 
 #[async_trait]
 impl SoftwareStorage for SqliteStorage {
+    async fn software_library(
+        &self,
+        request: &stabbur_storage_core::LibraryQuery,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<stabbur_storage_core::LibraryEntry>, StorageError> {
+        super::library::read(self, request, now).await
+    }
     async fn software_status(
         &self,
         software_id: stabbur_domain::SoftwareId,

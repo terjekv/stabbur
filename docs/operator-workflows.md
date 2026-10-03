@@ -29,8 +29,10 @@ The console logs in with the same Stabbur account as the CLI through its server-
    The CLI export workflow below also supports an existing Munki repository.
 
 Resource pages have shareable fragment URLs. Refresh and Back retain the selected resource.
-Search and status filters apply to the items loaded in the current view; **Load more** extends
-that set. Build targets show their own run history; global runs show software names and full IDs.
+The Library and Needs attention views search and filter the complete software catalog before
+pagination. Their URLs retain query, view, and sorting for sharing or bookmarking. Advanced resource
+lists still filter loaded items; **Load more** extends those lists. Build targets show their own run
+history; global runs show software names and full IDs.
 The console follows durable logs in bounded pages and can pause or resume updates. CLI watches
 remain the preferred option for unattended operation and exact exit-status handling.
 
@@ -240,3 +242,40 @@ failure does not prevent the worker from claiming builds; the worker retries on 
 Imported selectors use `/stabbur/outputs/<variable>`, the final value of each output variable across
 one isolated run receipt. Ambiguous multiple receipts provide no normalized outputs and the build
 fails validation instead of guessing an installer. Existing explicit receipt selectors remain supported.
+
+## Library and attention workflow
+
+Open **Library** to search applications by display name or slug. **Needs attention** and its preset
+views select current failing checks, missing compatible workers, or available candidate releases.
+Historical failures stop appearing after a successful replacement check. A running replacement is
+shown as outstanding work. Channel selections, build state, and review status remain separate.
+
+Select explicit applications across pages and searches, then **Create export from selection**.
+The 100-application limit applies across the entire selection. The export editor's **Selected
+applications** view retains choices independently of search pages. Configure installation settings,
+save the draft, preview the batch, then publish through the existing concurrency and eligibility
+checks. Saving a draft never changes delivery.
+
+The CLI provides the same search and attention predicates:
+
+```sh
+stabbur software search firefox --view review
+stabbur --json software search --view attention --all
+stabbur software search --sort newest --limit 50
+```
+
+Search uses literal substrings with ASCII case folding. Sort by display name or creation identity;
+software versions remain opaque. Cursors belong to their original query and cannot be reused with
+a different search, view, or sort. Lists are live observations, not a frozen database snapshot.
+
+In **Exports**, check a saved selection for publication changes. Open **Publication history** to
+compare an earlier snapshot and restore its exact release selection as a draft. The current export
+name, destination, and catalog stay in place. Preview and publish separately; withdrawn releases
+remain unavailable. Restoring repository content does not reverse installations already performed.
+
+Worker queue diagnostics group requirements that must match on a single worker. Active leases
+indicate work in progress, not a guaranteed concurrency limit. The existing recurring scheduler
+coalesces outstanding target runs and skips missed intervals.
+
+See [operator scale decisions](architecture/operator-scale.md) for accepted follow-on work and its
+measurement or policy prerequisites.

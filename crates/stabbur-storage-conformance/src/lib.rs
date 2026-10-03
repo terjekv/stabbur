@@ -81,6 +81,8 @@ pub async fn assert_storage_contract(storage: Arc<dyn Storage>) {
     )
     .await;
 
+    assert_library_contract(&storage, &software, now).await;
+
     let events = storage
         .audit_events(None, 200)
         .await
@@ -1510,6 +1512,18 @@ async fn assert_build_catalog_contract(
         .expect("candidate channel lookup must succeed")
         .expect("candidate channel must advance automatically");
     assert_eq!(candidate.release_id, completion.release.id);
+    let library_query = stabbur_storage_core::LibraryQuery::new(
+        stabbur_storage_core::LibrarySearch::new(software.slug.to_string()).unwrap(),
+        stabbur_storage_core::LibraryView::Review,
+        stabbur_storage_core::LibrarySort::Name,
+        None,
+        1,
+    )
+    .unwrap();
+    let review = storage.software_library(&library_query, now).await.unwrap();
+    assert_eq!(review.len(), 1);
+    assert_eq!(review[0].review_count, 1);
+    assert_eq!(review[0].review_release_id, Some(completion.release.id));
 
     let exact_time = now + Duration::seconds(2);
     let (exact_run, exact_claim) = prepare_build_attempt(
@@ -1823,6 +1837,13 @@ async fn assert_build_catalog_contract(
         "withdrawal preserves the attained lifecycle"
     );
     assert!(!withdrawn.availability.is_available());
+    assert!(
+        storage
+            .software_library(&library_query, now)
+            .await
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(withdrawn.revision, stable.revision + 1);
     assert!(storage.channels(software.id).await.unwrap().is_empty());
     assert!(
@@ -2559,4 +2580,87 @@ async fn assert_export_contract(
         .unwrap();
     assert!(storage.export_reader_valid(id, &replacement).await.unwrap());
     assert_eq!(storage.export_history(id, 0, 200).await.unwrap().len(), 2);
+}
+
+async fn assert_library_contract(
+    storage: &Arc<dyn Storage>,
+    existing: &Software,
+    now: DateTime<Utc>,
+) {
+    use stabbur_storage_core::{
+        LibraryPosition, LibraryQuery, LibrarySearch, LibrarySort, LibraryView,
+    };
+    // More than one server page; repeated display names require an identity tie-breaker.
+    let mut tx = storage.begin().await.unwrap();
+    for index in 0..240 {
+        tx.create_software(&Software {
+            id: SoftwareId::new(),
+            slug: SoftwareSlug::new(format!("library-fixture-{index:03}")).unwrap(),
+            name: format!("Library fixture {:03}", index / 2),
+            created_at: now,
+            revision: 1,
+        })
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+    let search = LibrarySearch::new("library-fixture".into()).unwrap();
+    let mut after = None;
+    let mut ids = std::collections::BTreeSet::new();
+    loop {
+        let request = LibraryQuery::new(
+            search.clone(),
+            LibraryView::NotBuilt,
+            LibrarySort::Name,
+            after,
+            37,
+        )
+        .unwrap();
+        let mut page = storage.software_library(&request, now).await.unwrap();
+        assert!(page.len() <= 38);
+        let more = page.len() > 37;
+        page.truncate(37);
+        for row in &page {
+            assert!(
+                ids.insert(row.software.id),
+                "cursor must not repeat tied names"
+            );
+            assert!(row.latest_run_id.is_none());
+            assert_eq!(row.review_count, 0);
+        }
+        if !more {
+            break;
+        }
+        let last = page.last().unwrap();
+        after = Some(LibraryPosition::new(last.software.name.clone(), last.software.id).unwrap());
+    }
+    assert_eq!(ids.len(), 240);
+    let query = LibraryQuery::new(
+        LibrarySearch::new("library-fixture-239".into()).unwrap(),
+        LibraryView::NotBuilt,
+        LibrarySort::Newest,
+        None,
+        1,
+    )
+    .unwrap();
+    let result = storage.software_library(&query, now).await.unwrap();
+    assert_eq!(result.len(), 1, "search is applied before the first page");
+    let status = storage.software_status(existing.id, now).await.unwrap();
+    let query = LibraryQuery::new(
+        LibrarySearch::new(existing.slug.to_string()).unwrap(),
+        LibraryView::All,
+        LibrarySort::Name,
+        None,
+        200,
+    )
+    .unwrap();
+    let result = storage.software_library(&query, now).await.unwrap();
+    let item = result
+        .iter()
+        .find(|r| r.software.id == existing.id)
+        .unwrap();
+    assert_eq!(item.channels, status.channels);
+    assert_eq!(item.latest_run_state, status.latest_run.map(|r| r.state));
+    assert_eq!(item.last_success_at, status.last_success_at);
+    assert_eq!(item.outstanding_runs, status.outstanding_runs);
 }

@@ -4,6 +4,8 @@ mod exports;
 pub use exports::*;
 mod operations;
 pub use operations::*;
+mod library;
+pub use library::*;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -167,6 +169,7 @@ pub fn configure(configuration: &mut web::ServiceConfig) {
                 .service(revoke_export_readers)
                 .service(export_repository)
                 .service(list_software)
+                .service(software_library)
                 .service(create_software)
                 .service(get_software)
                 .service(update_software)

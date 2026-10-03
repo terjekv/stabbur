@@ -141,6 +141,7 @@ pub struct ExportHistoryResponse {
     pub next_cursor: Option<String>,
 }
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ExportHistoryQuery {
     pub after: Option<u64>,
     pub limit: Option<u32>,

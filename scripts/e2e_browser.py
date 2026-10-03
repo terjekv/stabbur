@@ -153,7 +153,7 @@ def operator_workflows(origin, password, published_run):
     slug = 'browser-' + uuid.uuid4().hex[:10]
     name = 'Browser <img src=x onerror=window.fixtureInjected=true> ' + slug
     with console_page(origin, password, loopback_alias=True) as page:
-        expect(page.get_by_role('button', name='Workflow App', exact=True)).to_be_visible()
+        expect(page.get_by_role('link', name='Workflow App', exact=True)).to_be_visible()
         page.get_by_role('button', name='＋ Software', exact=True).click()
         dialog = page.get_by_role('dialog')
         dialog.get_by_label('Name *', exact=True).fill(name)
@@ -167,10 +167,10 @@ def operator_workflows(origin, password, published_run):
         dialog.get_by_role('button', name='Apply create software', exact=True).click()
         expect(dialog.get_by_role('status')).to_have_text('Action completed.')
         dialog.get_by_role('button', name='Close', exact=True).click()
-        expect(page.get_by_role('button', name=name, exact=True)).to_be_visible()
+        expect(page.get_by_role('link', name=name, exact=True)).to_be_visible()
         assert page.locator('main img[src=x]').count() == 0, 'server text became markup'
         assert page.evaluate('window.fixtureInjected === undefined'), 'server text executed'
-        page.get_by_role('button', name=name, exact=True).click()
+        page.get_by_role('link', name=name, exact=True).click()
         page.get_by_role('button', name='Edit software', exact=True).click()
         expect(dialog.get_by_label('Name', exact=True)).to_have_value(name)
         dialog.get_by_label('Name', exact=True).fill(name + ' updated')
@@ -183,7 +183,7 @@ def operator_workflows(origin, password, published_run):
         page.reload()
         expect(page.locator('main h1')).to_have_text(name + ' updated')
         assert page.url == saved_url
-        page.get_by_role('link', name='Runs', exact=True).first.click()
+        page.get_by_role('link', name='Activity', exact=True).first.click()
         expect(page.locator('main h1')).to_have_text('Runs')
         page.reload()
         expect(page.locator('main h1')).to_have_text('Runs')
@@ -219,7 +219,7 @@ def operator_workflows(origin, password, published_run):
         expect(page.get_by_role('button', name='Build now', exact=True)).to_be_disabled()
         # Disabled controls and labels stay readable under narrow viewport/reflow.
         page.set_viewport_size({'width':320,'height':800})
-        for title in ['Software','Build targets','Runs','Recipes','Workers','Storage','Access','Audit history','Catalog plans']:
+        for title in ['Library','Needs attention','Exports','Build targets','Activity','Recipes','Workers','Storage','Access','Audit history','Catalog plans']:
             expect(page.get_by_role('navigation').get_by_role('link',name=title,exact=True)).to_be_in_viewport()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'page overflows at 320px'
         page.keyboard.press('Tab')
@@ -347,6 +347,14 @@ def saved_export_workflow(origin, password):
         expect(dialog).to_contain_text('UNCHANGED')
         assert not definition_writes, 'previewing unchanged software must not create a definition revision'
         dialog.get_by_role('button',name='Close',exact=True).click()
+        page.get_by_text('Publication history',exact=True).click()
+        page.get_by_role('button',name='Compare and restore selection',exact=True).first.click()
+        expect(dialog).to_contain_text('unchanged')
+        dialog.get_by_role('checkbox').check()
+        dialog.get_by_role('button',name='Restore selection as draft',exact=True).click()
+        expect(dialog).not_to_be_visible()
+        expect(page.get_by_label('Version for Console delivery fixture',exact=True)).to_have_value('pin')
+        expect(page.locator('main')).to_contain_text('Snapshot 1.')
         page.set_viewport_size({'width':320,'height':800})
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'),'saved export overflows at 320px'
         page.set_viewport_size({'width':1280,'height':1000})
@@ -355,3 +363,42 @@ def saved_export_workflow(origin, password):
             page.get_by_role('link',name='Download repository files',exact=True).click()
         assert download.value.suggested_filename.endswith('.tar')
         return page.url.split('/')[-1], page.context.cookies()
+
+
+def library_workflow(origin, password):
+    """Server search and selection across pages without per-row status requests."""
+    with console_page(origin,password) as page:
+        requests=[]
+        page.on('request',lambda request: requests.append(request.url))
+        page.goto(origin+'/#/software?q=Scale%20application')
+        expect(page.get_by_role('link',name='Scale application 000',exact=True)).to_be_visible()
+        assert not any('/api/operation/software_status' in url for url in requests), 'library fetched per-row status'
+        page.get_by_role('checkbox',name='Select Scale application 000',exact=True).check()
+        expect(page.get_by_role('checkbox',name='Select Scale application 000',exact=True)).to_be_focused()
+        page.get_by_role('button',name='Next',exact=True).click()
+        expect(page.get_by_role('link',name='Scale application 050',exact=True)).to_be_visible()
+        page.get_by_role('checkbox',name='Select Scale application 050',exact=True).check()
+        expect(page.get_by_text('2 selected across pages',exact=True)).to_be_visible()
+        page.get_by_label('Search all applications',exact=True).fill('Scale application 239')
+        page.clock.run_for(300)
+        expect(page.get_by_role('link',name='Scale application 239',exact=True)).to_be_visible()
+        expect(page.locator('.library-table tbody tr')).to_have_count(1)
+        expect(page.get_by_text('2 selected across pages',exact=True)).to_be_visible()
+        page.get_by_role('button',name='Create export from selection',exact=True).click()
+        expect(page.get_by_text('2 applications selected across searches and pages',exact=True)).to_be_visible()
+        page.get_by_label('Show',exact=True).select_option('selected')
+        page.clock.run_for(300)
+        expect(page.get_by_role('checkbox',name='Scale application 000',exact=True)).to_be_checked()
+        expect(page.get_by_role('checkbox',name='Scale application 050',exact=True)).to_be_checked()
+        assert not any('/api/operation/list_software' in url for url in requests), 'picker downloaded the entire library'
+        page.goto(origin+'/#/attention?view=not_built&q=Scale%20application%20239')
+        expect(page.get_by_role('link',name='Scale application 239',exact=True)).to_be_visible()
+        page.reload()
+        expect(page.get_by_label('View',exact=True)).to_have_value('not_built')
+        expect(page.get_by_label('Search all applications',exact=True)).to_have_value('Scale application 239')
+        page.get_by_text('Worker queues by capability',exact=True).click()
+        expect(page.get_by_text('Active leases show current work. A compatible worker may already be busy.',exact=True)).to_be_visible()
+        page.set_viewport_size({'width':320,'height':800})
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'library overflows at 320px'
+        page.set_viewport_size({'width':1280,'height':900})
+        page.screenshot(path=str(Path(__file__).resolve().parents[1]/'target/library-ui.png'),full_page=True)

@@ -31,9 +31,9 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
 COMPANIONS = {
-    'stabbur-client-rust': '0634d8c177aa90c1bd86056a75fc67d2ae282ce5',
-    'stabbur-cli': '6b421601c0b2830383c08ac6015d20a41f0a3afc',
-    'stabbur-frontend': '25b297747239229b782dd67f504eac212c26ae0e',
+    'stabbur-client-rust': 'fa90bae509accc2d1d3b61ae288c6ea7a7ba86ea',
+    'stabbur-cli': '78b743ce453bc4c237cc86cc1ceec6096757a6c3',
+    'stabbur-frontend': '8c6265cfd38950d77a2f4ee9252eecbcf034236f',
 }
 COMPONENTS = ('server', 'worker', 'frontend')
 SAFE_PATH = '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin'

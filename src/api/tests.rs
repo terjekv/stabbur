@@ -1644,3 +1644,95 @@ async fn unauthenticated_requests_use_stable_problem_documents() {
     assert_eq!(problem["code"], "unauthorized");
     assert!(problem["request_id"].as_str().is_some());
 }
+
+#[actix_web::test]
+async fn library_filters_before_paging_and_binds_cursors_to_the_query() {
+    let (state, token, _temp) = authenticated_state().await;
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(state))
+            .configure(configure),
+    )
+    .await;
+    for (slug, name) in [
+        ("library", "Alpha"),
+        ("second", "Alpha"),
+        ("literal", "Percent %_"),
+    ] {
+        let response = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/api/v1/software")
+                .insert_header((header::AUTHORIZATION, format!("Bearer {token}")))
+                .set_json(serde_json::json!({"slug":slug,"name":name}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+    let anonymous = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/library/software")
+            .to_request(),
+    )
+    .await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    let get = |uri: &str| {
+        test::TestRequest::get()
+            .uri(uri)
+            .insert_header((header::AUTHORIZATION, format!("Bearer {token}")))
+            .to_request()
+    };
+    // Existing software slugs must not be shadowed by the new endpoint.
+    assert_eq!(
+        test::call_service(&app, get("/api/v1/software/library"))
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    let response = test::call_service(
+        &app,
+        get("/api/v1/library/software?q=alpha&limit=1&view=not_built"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let first: serde_json::Value = test::read_body_json(response).await;
+    assert_eq!(first["items"].as_array().unwrap().len(), 1);
+    assert_eq!(first["items"][0]["name"], "Alpha");
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let second: serde_json::Value = test::read_body_json(
+        test::call_service(
+            &app,
+            get(&format!(
+                "/api/v1/library/software?q=alpha&limit=1&view=not_built&cursor={cursor}"
+            )),
+        )
+        .await,
+    )
+    .await;
+    assert_ne!(first["items"][0]["id"], second["items"][0]["id"]);
+    assert!(second["next_cursor"].is_null());
+    for uri in [
+        format!("/api/v1/library/software?q=other&cursor={cursor}"),
+        "/api/v1/library/software?limit=201".into(),
+        "/api/v1/library/software?view=unknown".into(),
+        "/api/v1/library/software?q=bad%0Aquery".into(),
+    ] {
+        assert_eq!(
+            test::call_service(&app, get(&uri)).await.status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let literal: serde_json::Value = test::read_body_json(
+        test::call_service(&app, get("/api/v1/library/software?q=%25_")).await,
+    )
+    .await;
+    assert_eq!(literal["items"].as_array().unwrap().len(), 1);
+    assert_eq!(literal["items"][0]["slug"], "literal");
+    let attention: serde_json::Value = test::read_body_json(
+        test::call_service(&app, get("/api/v1/library/software?view=attention")).await,
+    )
+    .await;
+    assert!(attention["items"].as_array().unwrap().is_empty());
+}

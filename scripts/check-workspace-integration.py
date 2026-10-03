@@ -162,7 +162,7 @@ def run(args):
                 require(http(console, '/api/session', opener=browser)[0], 401, 'upstream revocation')
                 print('PASS: three pinned contracts, independent client, CLI pagination/catalog v2, console login/origin/CSRF/roles/logout/revocation')
                 if args.browser:
-                    from e2e_browser import operator_workflows, saved_export_workflow, console_page
+                    from e2e_browser import operator_workflows, saved_export_workflow, console_page, library_workflow
                     from console_fixture import publish_fixture
                     published_run = publish_fixture(origin, authorization, http)
                     snapshots = json.loads(subprocess.check_output(command + ['catalog', 'snapshots', '--all'], env=cli_env, timeout=20))
@@ -227,6 +227,12 @@ def run(args):
                     require(http(console,repo_path,headers=device_auth)[0],401,'CLI revocation invalidates browser-issued device profile')
                     print('PASS: browser saved selection and blocker preview; CLI reads, reviews, applies and downloads the same export; stale plans and existing destinations rejected')
 
+                    for index in range(240):
+                        require(http(origin, '/api/v1/software', {'slug':f'scale-{index:03}', 'name':f'Scale application {index:03}'}, authorization)[0], 201, 'seed scale library')
+                    result = json.loads(subprocess.check_output(command+['software','search','Scale application 239','--view','not_built'],env=cli_env,timeout=20))
+                    assert len(result['items'])==1 and result['items'][0]['slug']=='scale-239'
+                    library_workflow(console,password)
+                    print('PASS: 240-application search, no per-row status reads, selection across pages and queries, paginated export picker, shared views, CLI search, mobile layout')
                     print('PASS: console navigation, validation, catalog review, named builds, paginated logs, publication, stale promotion, expiry, literal text and mobile reflow')
                 if args.keep_running:
                     # Fixed public fixture credentials are printed only for interactive local QA; never a token.
