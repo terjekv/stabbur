@@ -336,10 +336,10 @@ def run(args, work, evidence):
                 value = api.call('/api/v1/runs/' + run_id)
                 require(value['state'] not in ('failed', 'cancelled'), 'AutoPkg run failed or cancelled')
                 return value if value['state'] == 'succeeded' else None
-            wait_for(completed, 'real AutoPkg build', 240)
+            completed_run = wait_for(completed, 'real AutoPkg build', 240)
             logs = gateway.call('/api/operation/list_run_logs', {'parameters': {'run': run_id}, 'query': {'limit': '200'}})
             require(bool(logs['items']), 'real build has persisted logs')
-            release = api.call('/api/v1/software/delivery-fixture/releases')['items'][0]
+            release = api.call('/api/v1/releases/' + completed_run['result']['publication']['release_id'])
             require(release['version'] == '1.0' and release['state'] == 'candidate', 'verified candidate release')
             evidence['stage'] = 'promotion-and-export'
             if args.browser:

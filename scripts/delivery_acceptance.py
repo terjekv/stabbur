@@ -124,7 +124,10 @@ def exercise_delivery(args, work, api, gateway, console, password, first_release
             result = api.call('/api/v1/runs/' + run['id'])
             require(result['state'] not in ('failed', 'cancelled'), 'real delivery build failed')
             if result['state'] == 'succeeded':
-                return api.call(f'/api/v1/software/{software}/releases')['items'][0]
+                release_id = result['result']['publication']['release_id']
+                release = api.call('/api/v1/releases/' + release_id)
+                require(release['software_id'] == result['software_id'], 'published release belongs to the completed build')
+                return release
             time.sleep(.25)
         raise AssertionError('delivery build timed out')
 
