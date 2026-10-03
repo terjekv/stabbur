@@ -1,5 +1,7 @@
 //! Actix handlers and application services for the released `/api/v1` slice.
 
+mod exports;
+pub use exports::*;
 mod operations;
 pub use operations::*;
 
@@ -153,6 +155,17 @@ pub fn configure(configuration: &mut web::ServiceConfig) {
                 .service(revoke_api_token)
                 .service(list_roles)
                 .service(create_role)
+                .service(list_exports)
+                .service(create_export)
+                .service(get_export)
+                .service(update_export)
+                .service(plan_export)
+                .service(apply_export)
+                .service(get_export_snapshot)
+                .service(list_export_history)
+                .service(create_export_reader)
+                .service(revoke_export_readers)
+                .service(export_repository)
                 .service(list_software)
                 .service(create_software)
                 .service(get_software)

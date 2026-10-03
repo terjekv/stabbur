@@ -222,7 +222,45 @@ def exercise_delivery(args, work, api, gateway, console, password, first_release
     finally:
         if args.install_fixture:
             command(['sudo', '-n', '/bin/rm', '-rf', installed_app])
+    # Saved batch exports combine independent library selections into one server-owned snapshot.
+    package_software=api.call('/api/v1/software/delivery-fixture')
+    app_software=api.call('/api/v1/software/delivery-app')
+    definition={'slug':'acceptance-batch','name':'Acceptance batch','destination':'hosted','catalog':'managed',
+        'selections':[
+            {'software':package_software['id'],'source':{'kind':'release','release':first_release['id']},'architectures':[],
+             'settings':{'format':'pkg','detection':detection}},
+            {'software':app_software['id'],'source':{'kind':'channel','channel':'testing'},'architectures':[],
+             'settings':{'format':'dmg_app','detection':{'kind':'application','name':app_name,'bundle_id':app_id}}}]}
+    saved=gateway.call('/api/operation/create_export',{'body':definition},expected=201)
+    parameters={'export':saved['id']}
+    preview=gateway.call('/api/operation/plan_export',{'parameters':parameters})
+    require(preview['ready'] and len(preview['items'])==2,'complete batch contains both selected installers')
+    published_batch=gateway.call('/api/exports/apply',preview)
+    require(published_batch['snapshot']['generation']==1,'batch publication is one generation')
+    batch_profile=plistlib.loads(gateway.call('/api/exports/'+saved['id']+'/profile',{'reviewed':True,'test_all':True}))['PayloadContent'][0]
+    batch_read=client(batch_profile)
+    batch_catalog=plistlib.loads(batch_read('catalogs/managed'))
+    require({item['name'] for item in batch_catalog}=={'delivery-fixture','delivery-app'},'Munki batch contains both applications')
+    require(next(item for item in batch_catalog if item['name']=='delivery-fixture')['version']=='1.0','exact pin keeps the approved older version')
+    try:
+        with test_mac(batch_profile,'saved-batch') as managed:
+            def verify_batch():
+                verify('1.0')
+                require((installed_app/'Contents/Info.plist').read_bytes()==(contents/'Info.plist').read_bytes(),'batch installs exact DMG application')
+            install_check(managed,'delivery-fixture',verify_batch)
+    finally:
+        if args.install_fixture:
+            command(['sudo','-n','/bin/rm','-rf',destination,installed_app])
+            subprocess.run(['sudo','-n','/usr/sbin/pkgutil','--forget',identifier],capture_output=True,timeout=30)
+    # General API withdrawal, outside the console, immediately filters the hosted snapshot.
+    current=api.call('/api/v1/releases/'+app_release['id'])
+    api.call('/api/v1/releases/'+app_release['id']+'/withdraw',{'reason':'Saved export external withdrawal'},headers={'If-Match':f'"rev-{current["revision"]}"'})
+    require(len(plistlib.loads(batch_read('catalogs/managed')))==1,'external withdrawal filters hosted catalog')
+    batch_read('pkgs/'+published['digest']+'.dmg',expected=404)
+    gateway.call('/api/operation/revoke_export_readers',{'parameters':parameters},expected=204)
+    batch_read('catalogs/managed',expected=401)
     return {'repository':'authenticated catalog, manifests, verified PKG and DMG bytes',
+            'saved_batch':'two applications, channel plus exact pin, atomic snapshot, external withdrawal and reader revocation; install/detection passed' if args.install_fixture else 'two-item publication and reader protocol passed; installation intentionally skipped',
             'upgrade':'1.0 to 2.0; stale publication rejected; old installer URL removed',
             'withdrawal':'catalog and installer removed through browser withdrawal',
             'installation':'PKG install, upgrade, DMG copy and repeat detection passed' if args.install_fixture else 'intentionally skipped'}

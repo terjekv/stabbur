@@ -16,6 +16,17 @@ use crate::{
         description = "Software artifact control plane and outbound worker coordination API"
     ),
     paths(
+        api::list_exports,
+        api::create_export,
+        api::get_export,
+        api::update_export,
+        api::plan_export,
+        api::apply_export,
+        api::get_export_snapshot,
+        api::list_export_history,
+        api::create_export_reader,
+        api::revoke_export_readers,
+        api::export_repository,
         api::healthz,
         api::readyz,
         api::openapi_document,
@@ -201,6 +212,7 @@ use crate::{
         (name = "workers", description = "Worker provisioning and administration"),
         (name = "jobs", description = "Builder-neutral scheduling state"),
         (name = "audit", description = "Append-only audit evidence"),
+        (name = "exports", description = "Saved selection, batch preview, atomic publication and Munki delivery"),
         (name = "system", description = "Service metadata")
     )
 )]
@@ -213,6 +225,10 @@ impl Modify for Security {
         use utoipa::openapi::security::{Http, HttpAuthScheme, SecurityScheme};
 
         if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "export_reader",
+                SecurityScheme::Http(Http::new(HttpAuthScheme::Basic)),
+            );
             components.add_security_scheme(
                 "bearer_auth",
                 SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
@@ -253,6 +269,17 @@ mod tests {
             })
             .collect::<BTreeSet<_>>();
         let expected = [
+            "get /api/v1/exports",
+            "post /api/v1/exports",
+            "get /api/v1/exports/{export}",
+            "put /api/v1/exports/{export}",
+            "post /api/v1/exports/{export}/plan",
+            "post /api/v1/exports/{export}/apply",
+            "get /api/v1/exports/{export}/snapshots/{generation}",
+            "get /api/v1/exports/{export}/history",
+            "post /api/v1/exports/{export}/readers",
+            "post /api/v1/exports/{export}/readers/revoke",
+            "get /api/v1/exports/{export}/repository/{kind}/{name}",
             "delete /api/v1/auth/tokens/{token}",
             "get /api/v1/artifacts/{digest}",
             "get /api/v1/artifacts/{digest}/content",

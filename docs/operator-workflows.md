@@ -109,41 +109,63 @@ objects or historical records. Repeat bounded passes when necessary.
 
 ## Export to Munki
 
-The console now also offers **Munki delivery**. With its private delivery storage configured,
-promote a release to testing, open its software page and continue to Munki delivery. Review the
-installer format and installed-state detection, then publish. The console supplies a protected
-repository URL, catalogs, manifests and verified installer bytes. Download a configuration profile
-for a test Mac with Munki installed; the application-specific profile requests that application's
-installation. Use Managed Software Center to install and check again. Confirm both checks before
-publishing to stable. A local loopback installation is reachable only from that same Mac.
+Build and approve releases into the software library first. In **Exports**, create a named
+selection, choose a hosted Munki repository or files for an existing repository, and select
+applications together. Each application follows an explicit channel or pins one exact release.
+Versions are opaque: a pin never silently advances because a different version looks newer.
 
-The console records reviewed publication snapshots separately from control-plane channels.
-Console withdrawal also removes its served copies; external API/CLI withdrawal requires explicit
-removal in Munki delivery. Already downloaded copies cannot be recalled. For repository deployment
-and credential rotation, see the independent frontend README. The CLI workflow below remains
-available for existing repositories.
+Review installation settings once per application in the export. Supported installers are flat
+PKG files with application or receipt detection, and DMG files containing an application at the
+image root. The release version must match the installed application or receipt version. Library
+presets prefill reviewed recipe settings. Apple silicon and Intel variants retain their macOS
+bounds; overlapping variants block publication until a channel pins an unambiguous variant.
 
-`stabbur munki-export <software> --channel stable --platform macos --architecture arm64
---macos 15.0 --extension pkg --pkginfo-template reviewed-pkginfo.json --output export` resolves one
-promoted installer, verifies a local SHA-256 download, and produces `pkgs/` and `pkgsinfo/` in a new
-directory. The version remains opaque. Export refuses to replace an existing directory.
+**Save selection** updates the draft only. **Preview batch** shows added, updated, unchanged,
+removed and blocked applications. **Publish snapshot** verifies every installer's SHA-256, size
+and format before advancing the complete export atomically. Definition, release and channel
+changes invalidate the reviewed preview. Missing settings, unapproved releases and unavailable
+installers block the whole batch; the previous snapshot remains available. Following a channel
+selects its current approved release at preview time; publication is manual.
 
-Provide a reviewed pkginfo JSON template (for example, converted from `makepkginfo` output), or store
-Munki-compatible install and detection dictionaries in the software metadata. Detection must include
-nonempty `installs` or `receipts`. The exporter owns name, exact version, SHA-256, rounded-up size in
-KiB, relative installer location, channel catalog and platform constraints. It removes template URL
-overrides. Installer behavior and detection metadata remain the packager's responsibility.
-See [Munki's supported keys](https://github.com/munki/munki/wiki/Supported-Pkginfo-Keys).
+Hosted exports use one stable protected repository URL. Open **Destination setup** to download a
+system configuration profile for managed Macs with Munki installed. The normal profile offers the
+applications in Managed Software Center. The disposable-test profile requests every application.
+Profiles contain export-only reader credentials, never Stabbur login credentials; administrators
+can revoke all earlier profiles and distribute replacements. A loopback URL works only on that
+Mac; a deployed repository needs a reachable HTTPS origin. General API or CLI withdrawal filters
+the hosted catalog and denies its installer immediately. Already downloaded bytes cannot be recalled.
 
-Review the export, copy it into your existing protected Munki repository, run `makecatalogs`, add the
-item to a test manifest, and exercise `managedsoftwareupdate --checkonly` followed by an explicitly
-approved install on a disposable test Mac. Verify installed-state detection prevents repeat installs,
-verify the downloaded installer hash, and record the source pin, run, release, channel revision and
-client result. Stabbur credentials are never embedded in the export or shared with managed devices.
+For an existing Munki repository, download a complete snapshot. The archive contains `pkgs`,
+`pkgsinfo`, `catalogs` and provenance in `export.json`; it contains no manifests or credentials.
+Merge the selected files into the destination, regenerate its catalogs with `makecatalogs`, and
+continue managing assignments there. A later Stabbur withdrawal cannot retract an offline copy.
 
-Exports are snapshots: subsequent withdrawal in Stabbur does not retract an already exported Munki
-catalog. Remove or replace that item in the delivery repository and rebuild its catalogs as part of
-incident response. No exporter can retroactively stop a device that already obtained installer bytes.
+The CLI uses the same saved definitions and plans:
+
+```sh
+stabbur exports list
+stabbur exports show staff-macs
+stabbur exports plan staff-macs --output reviewed-plan.json
+stabbur exports apply --plan-file reviewed-plan.json
+stabbur exports download staff-macs --output new-export
+stabbur exports profile staff-macs --output managed-macs.mobileconfig
+```
+
+`exports save --file definition.json` creates a draft. Updating one also requires `--export NAME
+--revision N` from `exports show`. Apply and profile creation require confirmation (`--yes` for
+reviewed automation). Downloads create `new-export/repository` and never replace an existing
+path. The definition JSON format is shown in [the example](examples/munki-export.json).
+
+The earlier console delivery screen remains under **Exports → Earlier Munki publications**, at
+its original repository URLs. Its local state is separate from saved server exports. For those
+legacy publications, an external API/CLI withdrawal still requires removal in the earlier screen.
+The single-installer `stabbur munki-export` command also remains available. Existing exports and
+profiles are not automatically migrated.
+
+Test on a disposable Mac: check for updates, install, open the application, and check again to
+ensure the installed version is detected. Also test upgrading from the previously deployed
+version. The acceptance suite exercises PKG installation, upgrades, DMG application copying,
+a two-application saved export, reader revocation and external withdrawal.
 
 ## Cross-repository checks
 

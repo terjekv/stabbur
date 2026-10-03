@@ -298,3 +298,41 @@ def operator_workflows(origin, password, published_run):
         expect(page.get_by_role('heading', name='Delivery and builds', exact=True)).to_be_visible()
         page.get_by_role('button', name='Sign out', exact=True).click()
         expect(page.get_by_role('button', name='Sign in', exact=True)).to_be_visible()
+
+
+def saved_export_workflow(origin, password):
+    """Bulk draft, blocker, reusable settings, atomic publish and mobile layout."""
+    with console_page(origin,password) as page:
+        page.get_by_role('link',name='Exports',exact=True).click()
+        page.get_by_role('button',name='New export',exact=True).click()
+        page.get_by_label('Export name',exact=True).fill('Staff Macs')
+        page.get_by_label('Munki catalog',exact=True).fill('production')
+        page.get_by_role('checkbox',name='Console delivery fixture',exact=True).check()
+        app=page.locator('.export-selection').filter(has=page.get_by_role('checkbox',name='Console delivery fixture',exact=True))
+        app.get_by_role('button',name='Set installation settings',exact=True).click()
+        dialog=page.get_by_role('dialog')
+        dialog.get_by_label('Detect installation by',exact=True).select_option('receipt')
+        dialog.get_by_label('Package identifier',exact=True).fill('org.example.fixture')
+        dialog.get_by_role('button',name='Use these settings',exact=True).click()
+        page.get_by_role('checkbox',name='<img src=x onerror=alert(1)>',exact=True).check()
+        assert page.locator('main img').count()==0
+        page.get_by_role('button',name='Preview batch',exact=True).click()
+        expect(dialog).to_contain_text('BLOCKED')
+        expect(dialog.get_by_role('button',name='Publish snapshot',exact=True)).to_have_count(0)
+        dialog.get_by_role('button',name='Close',exact=True).click()
+        page.get_by_role('checkbox',name='<img src=x onerror=alert(1)>',exact=True).uncheck()
+        page.get_by_role('button',name='Preview batch',exact=True).click()
+        expect(dialog).to_contain_text('ADD · Console delivery fixture')
+        dialog.get_by_role('checkbox').check()
+        dialog.get_by_role('button',name='Publish snapshot',exact=True).click()
+        expect(dialog).not_to_be_visible(timeout=30000)
+        expect(page.get_by_role('heading',name='Staff Macs',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='Download repository files',exact=True)).to_be_visible()
+        page.set_viewport_size({'width':320,'height':800})
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'),'saved export overflows at 320px'
+        page.set_viewport_size({'width':1280,'height':1000})
+        page.screenshot(path=str(Path(__file__).resolve().parents[1]/'target/exports-ui.png'),full_page=True)
+        with page.expect_download() as download:
+            page.get_by_role('link',name='Download repository files',exact=True).click()
+        assert download.value.suggested_filename.endswith('.tar')
+        return page.url.split('/')[-1], page.context.cookies()

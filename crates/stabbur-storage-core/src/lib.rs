@@ -1,5 +1,8 @@
 //! Aggregate- and operation-shaped storage capabilities and explicit transaction context.
 
+mod exports;
+pub use exports::*;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -1433,6 +1436,7 @@ pub trait Storage:
     + RunStorage
     + BuildStorage
     + CatalogStorage
+    + ExportStorage
     + RunLogStorage
     + JobStorage
     + AuditStorage

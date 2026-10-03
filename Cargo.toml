@@ -78,6 +78,7 @@ chrono.workspace = true
 clap.workspace = true
 futures-util.workspace = true
 hex.workspace = true
+plist.workspace = true
 http.workspace = true
 rand.workspace = true
 reqwest.workspace = true

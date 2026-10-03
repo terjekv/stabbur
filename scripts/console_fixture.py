@@ -53,7 +53,7 @@ def publish_fixture(origin, authorization, http):
         entries = [{'stream':'stdout','message_base64':base64.b64encode(f'Fixture log {i:03d}\n'.encode()).decode()}
                    for i in range(batch * 80,(batch + 1) * 80)]
         call(prefix + '/logs', {'lease':claimed['lease'],'idempotency_key':f'fixture-logs-{batch}','entries':entries},worker_auth,201)
-    content = b'Stabbur browser fixture bytes; not an installable package.'
+    content = b'xar!Stabbur browser fixture bytes; not an installable package.'
     digest = hashlib.sha256(content).hexdigest()
     upload = urllib.request.Request(origin + prefix + '/attempts/' + claimed['lease']['attempt_id'] + '/artifacts/' + digest,
         method='PUT',data=content,headers={**worker_auth,'content-type':'application/octet-stream','x-stabbur-artifact-role':'primary_installer'})

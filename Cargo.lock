@@ -2082,6 +2082,7 @@ dependencies = [
  "futures-util",
  "hex",
  "http 1.5.0",
+ "plist",
  "rand 0.9.5",
  "reqwest",
  "rpassword",
@@ -2112,6 +2113,7 @@ name = "stabbur-storage-conformance"
 version = "0.0.1"
 dependencies = [
  "chrono",
+ "futures-util",
  "serde_json",
  "stabbur-auth-core",
  "stabbur-builder-core",
@@ -2155,6 +2157,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "fs2",
+ "serde",
  "serde_json",
  "sqlx-core",
  "sqlx-sqlite",

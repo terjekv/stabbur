@@ -3,6 +3,7 @@
 mod artifacts;
 mod build_targets;
 mod catalog;
+mod exports;
 mod identity;
 mod jobs;
 mod operations;
@@ -86,6 +87,13 @@ fn embedded_migrator() -> Migrator {
             Cow::Borrowed("operator workflows"),
             MigrationType::Simple,
             Cow::Borrowed(include_str!("../migrations/0002_operator_workflows.sql")),
+            false,
+        ),
+        Migration::new(
+            3,
+            Cow::Borrowed("saved exports"),
+            MigrationType::Simple,
+            Cow::Borrowed(include_str!("../migrations/0003_saved_exports.sql")),
             false,
         ),
     ];
@@ -2440,13 +2448,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fresh_schema_applies_baseline_and_operator_migration() {
+    async fn fresh_schema_applies_all_embedded_migrations() {
         let storage = storage().await;
         let migration_count: i64 = query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
             .fetch_one(storage.pool_for_tests())
             .await
             .unwrap();
-        assert_eq!(migration_count, 2);
+        assert_eq!(migration_count, 3);
         let catalog_table: i64 = query_scalar(
             "SELECT COUNT(*) FROM sqlite_schema
              WHERE type = 'table' AND name = 'recipe_catalog_snapshots'",

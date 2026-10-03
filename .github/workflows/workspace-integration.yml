@@ -7,13 +7,13 @@ on:
     inputs:
       client_ref:
         description: Client commit or branch for coordinated review
-        default: 9d088c263c843d6fc71524acba2cb31b075d5280
+        default: 0634d8c177aa90c1bd86056a75fc67d2ae282ce5
       cli_ref:
         description: CLI commit or branch for coordinated review
-        default: 7e498ec5c9f3f6532404934cb06449b1712887e4
+        default: 6b421601c0b2830383c08ac6015d20a41f0a3afc
       frontend_ref:
         description: Console commit or branch for coordinated review
-        default: 5743839d64187019ae9846d01fcdc53d6017398e
+        default: 795e7b54ceaee499db4444eee53f046342a7bb93
 permissions:
   contents: read
 concurrency:
@@ -39,19 +39,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-client-rust
-          ref: ${{ inputs.client_ref || '9d088c263c843d6fc71524acba2cb31b075d5280' }}
+          ref: ${{ inputs.client_ref || '0634d8c177aa90c1bd86056a75fc67d2ae282ce5' }}
           path: stabbur-client-rust
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-cli
-          ref: ${{ inputs.cli_ref || '7e498ec5c9f3f6532404934cb06449b1712887e4' }}
+          ref: ${{ inputs.cli_ref || '6b421601c0b2830383c08ac6015d20a41f0a3afc' }}
           path: stabbur-cli
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-frontend
-          ref: ${{ inputs.frontend_ref || '5743839d64187019ae9846d01fcdc53d6017398e' }}
+          ref: ${{ inputs.frontend_ref || '795e7b54ceaee499db4444eee53f046342a7bb93' }}
           path: stabbur-frontend
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
