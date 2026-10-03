@@ -13,7 +13,7 @@ on:
         default: 6b421601c0b2830383c08ac6015d20a41f0a3afc
       frontend_ref:
         description: Console commit or branch for coordinated review
-        default: 0aff7f088150c351b57a02ba8e2ed3507d675734
+        default: df63a14abc56ba6e6f3734a1209e7d04cddef800
 permissions:
   contents: read
 concurrency:
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: terjekv/stabbur-frontend
-          ref: ${{ inputs.frontend_ref || '0aff7f088150c351b57a02ba8e2ed3507d675734' }}
+          ref: ${{ inputs.frontend_ref || 'df63a14abc56ba6e6f3734a1209e7d04cddef800' }}
           path: stabbur-frontend
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
