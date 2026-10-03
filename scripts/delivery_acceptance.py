@@ -51,6 +51,8 @@ def exercise_delivery(args, work, api, gateway, console, password, first_release
         body = gateway.call('/api/delivery/profile', {'channel': channel, 'software': software})
         config = plistlib.loads(body)
         require(config['PayloadType'] == 'Configuration', 'download is a real macOS profile')
+        require(config['PayloadScope'] == 'System', 'Munki preferences must apply system-wide')
+        require(config['PayloadContent'][0]['PayloadType'] == 'ManagedInstalls', 'profile targets the preferences domain read by Munki')
         return config['PayloadContent'][0]
 
     def client(preferences):

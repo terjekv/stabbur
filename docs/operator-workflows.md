@@ -12,9 +12,10 @@ The console logs in with the same Stabbur account as the CLI through its server-
 2. Check `stabbur status` and `stabbur worker list`. In the console, inspect Workers. Confirm that
    the intended worker is enabled, recently observed, and advertises the capabilities required
    by the exact recipe revision. A successful login does not establish worker readiness.
-3. Add software and a reviewed recipe revision, or review and apply a catalog plan. Open the
-   software page and choose **Add build target**. Select the software, recipe and exact revision.
-   Start with a manual schedule. New console targets default to disabled.
+3. Choose **Add software from recipes**. Start with a reviewed Firefox, Thunderbird or VLC
+   preset, or select a recipe from a worker's inventory. Review the exact source commits and
+   import plan. This creates the software, recipe revision and a disabled manual build target.
+   Existing custom recipes can also be connected using **Add build target** on the software page.
 4. For a disabled manual target, choose **Review and build**, check its source pins and worker,
    then **Enable and start build**. Existing enabled targets use **Build now**. The console opens the run's progress,
    replayed logs and verification result. The CLI equivalent is
@@ -23,8 +24,9 @@ The console logs in with the same Stabbur account as the CLI through its server-
    platform variants, then promote to testing. The promotion preview shows the current and
    proposed channel selections. Validate installation and detection on a test device before
    promoting to stable.
-6. Resolve or export the stable installer using the reviewed delivery workflow below. Browser
-   publication alone does not install software on a device or update an existing Munki export.
+6. Open **Munki delivery** from the software page, publish the testing installer, and download
+   its test Mac profile. Install and check again on the test Mac before publishing to stable.
+   The CLI export workflow below also supports an existing Munki repository.
 
 Resource pages have shareable fragment URLs. Refresh and Back retain the selected resource.
 Search and status filters apply to the items loaded in the current view; **Load more** extends

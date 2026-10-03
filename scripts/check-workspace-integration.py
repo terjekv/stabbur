@@ -130,6 +130,14 @@ def run(args):
                 csrf_headers = {'origin': console, 'x-csrf-token': session['csrf']}
                 require(http(console, '/api/delivery/profile', {'channel':'testing'}, {'origin':console}, browser)[0], 403, 'delivery profile requires CSRF')
                 require(http(console, '/api/delivery/profile', {'channel':'testing'}, {**csrf_headers,'origin':'https://untrusted.example'}, browser)[0], 403, 'delivery profile requires exact origin')
+                profile_status, profile_headers, profile_bytes = http(console, '/api/delivery/profile', {'channel':'testing'}, csrf_headers, browser)
+                require(profile_status, 200, 'administrator can download device profile')
+                require(profile_headers['content-disposition'].startswith('attachment;'), True, 'profile is a credential attachment')
+                import plistlib
+                profile = plistlib.loads(profile_bytes)
+                require(profile['PayloadScope'], 'System', 'profile is system-wide')
+                require(profile['PayloadContent'][0]['PayloadType'], 'ManagedInstalls', 'profile targets Munki preferences')
+                require(profile['PayloadContent'][0]['SoftwareRepoURL'], console + '/munki/testing', 'profile selects exact repository channel')
                 require(http(console, '/munki/testing/catalogs/testing')[0], 401, 'repository requires separate device credential')
                 require(http(console, '/api/operation/list_software', {}, {'origin': console}, browser)[0], 403, 'missing CSRF')
                 require(http(console, '/api/recipe-import', import_body, {'origin':console}, browser)[0], 403, 'import missing CSRF')
