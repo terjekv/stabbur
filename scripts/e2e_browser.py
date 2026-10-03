@@ -1,6 +1,7 @@
 """Headless browser acceptance against only a harness-owned loopback console.
 
-No saved authentication state, HAR, trace, video or credential downloads are collected.
+Authentication cookies are reused only in process memory. No state files, HAR, trace, video
+or credential downloads are collected.
 """
 import re
 from pathlib import Path
@@ -8,6 +9,9 @@ from contextlib import contextmanager
 from urllib.parse import urlsplit
 
 from playwright.sync_api import expect, sync_playwright
+
+# Sessions belong only to disposable loopback fixtures; never persist or print these values.
+_fixture_sessions = {}
 
 
 @contextmanager
@@ -17,6 +21,7 @@ def console_page(origin, password, loopback_alias=False):
         browser = playwright.chromium.launch()
         try:
             context = browser.new_context(viewport={'width': 1280, 'height': 900})
+            context.add_cookies(_fixture_sessions.get(origin, []))
             alias = origin.replace('://127.0.0.1:', '://localhost:')
             allowed = (origin + '/', alias + '/') if loopback_alias else (origin + '/',)
             context.route('**/*', lambda route: route.continue_()
@@ -31,7 +36,11 @@ def console_page(origin, password, loopback_alias=False):
                 expect(page).to_have_url(origin + '/#/software')
             else:
                 page.goto(origin)
-            login(page, password)
+            username=page.get_by_label('Username',exact=True)
+            navigation=page.get_by_role('navigation',name='Management')
+            username.or_(navigation).first.wait_for(state='visible')
+            if username.is_visible():
+                login(page,password)
             try:
                 yield page
             except Exception:
@@ -40,6 +49,7 @@ def console_page(origin, password, loopback_alias=False):
                 print('Console feedback:', page.locator('.feedback').all_text_contents())
                 raise
             assert not errors, 'browser application raised an uncaught error'
+            _fixture_sessions[origin]=context.cookies()
         finally:
             browser.close()
 
@@ -47,8 +57,34 @@ def console_page(origin, password, loopback_alias=False):
 def login(page, password):
     page.get_by_label('Username', exact=True).fill('live-admin')
     page.get_by_label('Password', exact=True).fill(password)
-    page.get_by_role('button', name='Sign in', exact=True).click()
-    expect(page.get_by_role('navigation', name='Management')).to_be_visible()
+    with page.expect_response(lambda response: response.url.endswith('/api/login')) as response:
+        page.get_by_role('button', name='Sign in', exact=True).click()
+    assert response.value.status==200, f'Fixture login returned HTTP {response.value.status}'
+    expect(page.get_by_role('navigation', name='Management')).to_be_visible(timeout=15000)
+
+
+def publish_delivery(origin, password, software, version, detection, kind, channel, tested):
+    with console_page(origin, password) as page:
+        page.goto(origin + '/#/delivery/' + software)
+        page.get_by_role('button', name=re.compile('^Publish .* to ' + channel + '$')).click()
+        dialog = page.get_by_role('dialog')
+        expect(dialog.get_by_role('heading', name=re.compile(re.escape(version) + ' → ' + channel))).to_be_visible()
+        dialog.get_by_label('Test Mac macOS version', exact=True).fill('15.0')
+        dialog.get_by_label('Installer format', exact=True).select_option(kind)
+        dialog.get_by_label('Detect installed software using', exact=True).select_option(detection['kind'])
+        if detection['kind'] == 'receipt':
+            dialog.get_by_label('Package identifier', exact=True).fill(detection['package_id'])
+        else:
+            dialog.get_by_label('Application filename', exact=True).fill(detection['name'])
+            dialog.get_by_label('Bundle identifier', exact=True).fill(detection['bundle_id'])
+        if tested:
+            dialog.get_by_role('checkbox', name='I verified installation and confirmed that a second update check does not offer this version again.', exact=True).check()
+        dialog.get_by_role('checkbox', name='I reviewed this exact release, installer format, architecture and detection settings.', exact=True).check()
+        dialog.get_by_role('button', name='Publish to ' + channel, exact=True).click()
+        expect(dialog).not_to_be_visible(timeout=60000)
+        expect(page.get_by_role('heading', name='Published versions', exact=True)).to_be_visible()
+        page.set_viewport_size({'width':320,'height':800})
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'Munki delivery overflows at 320px'
 
 
 def start_build(origin, password, manifest):
@@ -65,9 +101,9 @@ def start_build(origin, password, manifest):
         dialog.get_by_role('button', name='Close', exact=True).click()
         page.get_by_role('link', name='Build targets', exact=True).click()
         page.get_by_role('button', name='delivery-build', exact=True).click()
-        page.get_by_role('button', name='Build now', exact=True).click()
+        page.get_by_role('button', name='Review and build', exact=True).click()
         dialog.get_by_role('checkbox').check()
-        dialog.get_by_role('button', name='Start build', exact=True).click()
+        dialog.get_by_role('button', name='Enable and start build', exact=True).click()
         expect(page).to_have_url(re.compile(r'/#/runs/[0-9a-f-]+$'))
         run_id = page.url.rsplit('/', 1)[-1]
         page.get_by_role('button', name='Sign out', exact=True).click()
@@ -81,7 +117,7 @@ def start_build(origin, password, manifest):
         return run_id
 
 
-def promote_release(origin, password, run_id, release_id):
+def promote_release(origin, password, run_id, release_id, channel='stable'):
     with console_page(origin, password) as page:
         page.goto(origin + '/#/runs/' + run_id)
         expect(page.locator('pre.logs')).not_to_be_empty()
@@ -89,12 +125,12 @@ def promote_release(origin, password, run_id, release_id):
         expect(page).to_have_url(re.compile(r'/#/releases/' + release_id + '$'))
         page.get_by_role('button', name='Promote release', exact=True).click()
         dialog = page.get_by_role('dialog')
-        dialog.get_by_label('Channel *', exact=True).select_option('stable')
+        dialog.get_by_label('Channel *', exact=True).select_option(channel)
         expect(dialog.get_by_label('Variant', exact=True)).to_be_enabled()
         dialog.get_by_role('checkbox').check()
         dialog.get_by_role('button', name='Promote release', exact=True).click()
         expect(page.get_by_role('heading', name='Delivery and builds', exact=True)).to_be_visible()
-        expect(page.locator('main')).to_contain_text('stable:')
+        expect(page.locator('main')).to_contain_text(channel + ':')
 
 
 def withdraw_release(origin, password, release_id):
@@ -117,7 +153,7 @@ def operator_workflows(origin, password, published_run):
     slug = 'browser-' + uuid.uuid4().hex[:10]
     name = 'Browser <img src=x onerror=window.fixtureInjected=true> ' + slug
     with console_page(origin, password, loopback_alias=True) as page:
-        expect(page.get_by_role('button', name='Workflow App', exact=True)).to_be_visible()
+        expect(page.get_by_role('link', name='Workflow App', exact=True)).to_be_visible()
         page.get_by_role('button', name='＋ Software', exact=True).click()
         dialog = page.get_by_role('dialog')
         dialog.get_by_label('Name *', exact=True).fill(name)
@@ -131,10 +167,10 @@ def operator_workflows(origin, password, published_run):
         dialog.get_by_role('button', name='Apply create software', exact=True).click()
         expect(dialog.get_by_role('status')).to_have_text('Action completed.')
         dialog.get_by_role('button', name='Close', exact=True).click()
-        expect(page.get_by_role('button', name=name, exact=True)).to_be_visible()
+        expect(page.get_by_role('link', name=name, exact=True)).to_be_visible()
         assert page.locator('main img[src=x]').count() == 0, 'server text became markup'
         assert page.evaluate('window.fixtureInjected === undefined'), 'server text executed'
-        page.get_by_role('button', name=name, exact=True).click()
+        page.get_by_role('link', name=name, exact=True).click()
         page.get_by_role('button', name='Edit software', exact=True).click()
         expect(dialog.get_by_label('Name', exact=True)).to_have_value(name)
         dialog.get_by_label('Name', exact=True).fill(name + ' updated')
@@ -147,7 +183,7 @@ def operator_workflows(origin, password, published_run):
         page.reload()
         expect(page.locator('main h1')).to_have_text(name + ' updated')
         assert page.url == saved_url
-        page.get_by_role('link', name='Runs', exact=True).first.click()
+        page.get_by_role('link', name='Activity', exact=True).first.click()
         expect(page.locator('main h1')).to_have_text('Runs')
         page.reload()
         expect(page.locator('main h1')).to_have_text('Runs')
@@ -183,7 +219,7 @@ def operator_workflows(origin, password, published_run):
         expect(page.get_by_role('button', name='Build now', exact=True)).to_be_disabled()
         # Disabled controls and labels stay readable under narrow viewport/reflow.
         page.set_viewport_size({'width':320,'height':800})
-        for title in ['Software','Build targets','Runs','Recipes','Workers','Storage','Access','Audit history','Catalog plans']:
+        for title in ['Library','Needs attention','Exports','Build targets','Activity','Recipes','Workers','Storage','Access','Audit history','Catalog plans']:
             expect(page.get_by_role('navigation').get_by_role('link',name=title,exact=True)).to_be_in_viewport()
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'page overflows at 320px'
         page.keyboard.press('Tab')
@@ -204,21 +240,24 @@ def operator_workflows(origin, password, published_run):
         # The portable fake build intentionally has no artifacts or logs. A leased publication
         # fixture exercises replay across multiple pages and the actual server publication policy.
         page.goto(origin + '/#/recipes')
-        page.get_by_role('button', name='Import recipes', exact=True).click()
-        page.get_by_role('heading', name='Import recipes', exact=True).wait_for()
-        ready = page.get_by_role('checkbox', name='example.download.ImportedApp', exact=True)
+        page.get_by_role('button', name='Add software from recipes', exact=True).click()
+        page.get_by_role('heading', name='Add software', exact=True).wait_for()
+        ready = page.get_by_role('checkbox', name='Select example.download.ImportedApp', exact=True)
         ready.wait_for()
-        assert page.get_by_role('checkbox', name='example.override.Uncommitted', exact=True).is_disabled()
+        assert page.get_by_role('checkbox', name='Select example.override.Uncommitted', exact=True).is_disabled()
         ready.check()
         page.set_viewport_size({'width':320,'height':800})
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'recipe import overflows at 320px'
         page.set_viewport_size({'width':1280,'height':900})
         page.screenshot(path=str(Path(__file__).resolve().parents[1] / 'target/import-ui.png'), full_page=True)
-        page.get_by_label('Artifact architecture', exact=True).select_option('aarch64')
+        page.get_by_label('Installer architecture for Imported App', exact=True).select_option('aarch64')
         page.get_by_label('Software slug', exact=True).fill('console-imported-app')
         page.get_by_label('Software name', exact=True).fill('Imported application')
-        page.get_by_role('button', name='Review import plan', exact=True).click()
+        page.get_by_label('Version output variable', exact=True).fill('version')
+        page.get_by_label('Installer output variable', exact=True).fill('pathname')
+        page.get_by_role('button', name='Review sources and import plan', exact=True).click()
         page.get_by_role('heading', name='Catalog plans', exact=True).wait_for()
+        expect(page).to_have_url(re.compile(r'/#/catalog$'))
         page.get_by_text('Will be disabled', exact=False).wait_for()
         page.get_by_role('checkbox', name='I have reviewed every change, source pin and target that will be enabled.', exact=True).check()
         page.get_by_role('button', name='Apply reviewed plan', exact=True).click()
@@ -228,6 +267,13 @@ def operator_workflows(origin, password, published_run):
         imported_row = page.get_by_role('row').filter(has_text='console-imported-app')
         imported_row.wait_for()
         assert 'Disabled' in imported_row.inner_text()
+        imported_row.get_by_role('button').click()
+        page.get_by_role('button', name='Review and build', exact=True).click()
+        expect(dialog.get_by_role('checkbox')).to_be_visible()
+        expect(dialog).to_contain_text('console-fixture-worker')
+        expect(dialog).to_contain_text('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+        expect(dialog.get_by_role('button', name='Enable and start build', exact=True)).to_be_enabled()
+        page.get_by_role('button', name='Close', exact=True).click()
 
         page.goto(origin + '/#/runs/' + published_run)
         expect(page.get_by_role('link', name='Review resulting release', exact=True)).to_be_visible(timeout=20000)
@@ -264,3 +310,95 @@ def operator_workflows(origin, password, published_run):
         expect(page.get_by_role('heading', name='Delivery and builds', exact=True)).to_be_visible()
         page.get_by_role('button', name='Sign out', exact=True).click()
         expect(page.get_by_role('button', name='Sign in', exact=True)).to_be_visible()
+
+
+def saved_export_workflow(origin, password):
+    """Bulk draft, blocker, reusable settings, atomic publish and mobile layout."""
+    with console_page(origin,password) as page:
+        page.get_by_role('link',name='Exports',exact=True).click()
+        page.get_by_role('button',name='New export',exact=True).click()
+        page.get_by_label('Export name',exact=True).fill('Staff Macs')
+        page.get_by_label('Munki catalog',exact=True).fill('production')
+        page.get_by_role('checkbox',name='Console delivery fixture',exact=True).check()
+        app=page.locator('.export-selection').filter(has=page.get_by_role('checkbox',name='Console delivery fixture',exact=True))
+        app.get_by_role('button',name='Set installation settings',exact=True).click()
+        dialog=page.get_by_role('dialog')
+        dialog.get_by_label('Detect installation by',exact=True).select_option('receipt')
+        dialog.get_by_label('Package identifier',exact=True).fill('org.example.fixture')
+        dialog.get_by_role('button',name='Use these settings',exact=True).click()
+        page.get_by_role('checkbox',name='<img src=x onerror=alert(1)>',exact=True).check()
+        assert page.locator('main img').count()==0
+        page.get_by_role('button',name='Preview batch',exact=True).click()
+        expect(dialog).to_contain_text('BLOCKED')
+        expect(dialog.get_by_role('button',name='Publish snapshot',exact=True)).to_have_count(0)
+        dialog.get_by_role('button',name='Close',exact=True).click()
+        page.get_by_role('checkbox',name='<img src=x onerror=alert(1)>',exact=True).uncheck()
+        page.get_by_role('button',name='Preview batch',exact=True).click()
+        expect(dialog).to_contain_text('ADD · Console delivery fixture')
+        dialog.get_by_role('checkbox').check()
+        dialog.get_by_role('button',name='Publish snapshot',exact=True).click()
+        expect(dialog).not_to_be_visible(timeout=30000)
+        expect(page.get_by_role('heading',name='Staff Macs',exact=True)).to_be_visible()
+        expect(page.get_by_role('link',name='Download repository files',exact=True)).to_be_visible()
+        expect(page.locator('.export-published-versions')).to_contain_text('Console delivery fixture fixture-01')
+        definition_writes=[]
+        page.on('request',lambda request: definition_writes.append(True) if request.url.endswith('/api/operation/update_export') else None)
+        page.get_by_role('button',name='Preview batch',exact=True).click()
+        expect(dialog).to_contain_text('UNCHANGED')
+        assert not definition_writes, 'previewing unchanged software must not create a definition revision'
+        dialog.get_by_role('button',name='Close',exact=True).click()
+        page.get_by_text('Publication history',exact=True).click()
+        page.get_by_role('button',name='Compare and restore selection',exact=True).first.click()
+        expect(dialog).to_contain_text('unchanged')
+        dialog.get_by_role('checkbox').check()
+        dialog.get_by_role('button',name='Restore selection as draft',exact=True).click()
+        expect(dialog).not_to_be_visible()
+        expect(page.get_by_label('Version for Console delivery fixture',exact=True)).to_have_value('pin')
+        expect(page.locator('main')).to_contain_text('Snapshot 1.')
+        page.set_viewport_size({'width':320,'height':800})
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'),'saved export overflows at 320px'
+        page.set_viewport_size({'width':1280,'height':1000})
+        page.screenshot(path=str(Path(__file__).resolve().parents[1]/'target/exports-ui.png'),full_page=True)
+        with page.expect_download() as download:
+            page.get_by_role('link',name='Download repository files',exact=True).click()
+        assert download.value.suggested_filename.endswith('.tar')
+        return page.url.split('/')[-1], page.context.cookies()
+
+
+def library_workflow(origin, password):
+    """Server search and selection across pages without per-row status requests."""
+    with console_page(origin,password) as page:
+        requests=[]
+        page.on('request',lambda request: requests.append(request.url))
+        page.goto(origin+'/#/software?q=Scale%20application')
+        expect(page.get_by_role('link',name='Scale application 000',exact=True)).to_be_visible()
+        assert not any('/api/operation/software_status' in url for url in requests), 'library fetched per-row status'
+        page.get_by_role('checkbox',name='Select Scale application 000',exact=True).check()
+        expect(page.get_by_role('checkbox',name='Select Scale application 000',exact=True)).to_be_focused()
+        page.get_by_role('button',name='Next',exact=True).click()
+        expect(page.get_by_role('link',name='Scale application 050',exact=True)).to_be_visible()
+        page.get_by_role('checkbox',name='Select Scale application 050',exact=True).check()
+        expect(page.get_by_text('2 selected across pages',exact=True)).to_be_visible()
+        page.get_by_label('Search all applications',exact=True).fill('Scale application 239')
+        page.clock.run_for(300)
+        expect(page.get_by_role('link',name='Scale application 239',exact=True)).to_be_visible()
+        expect(page.locator('.library-table tbody tr')).to_have_count(1)
+        expect(page.get_by_text('2 selected across pages',exact=True)).to_be_visible()
+        page.get_by_role('button',name='Create export from selection',exact=True).click()
+        expect(page.get_by_text('2 applications selected across searches and pages',exact=True)).to_be_visible()
+        page.get_by_label('Show',exact=True).select_option('selected')
+        page.clock.run_for(300)
+        expect(page.get_by_role('checkbox',name='Scale application 000',exact=True)).to_be_checked()
+        expect(page.get_by_role('checkbox',name='Scale application 050',exact=True)).to_be_checked()
+        assert not any('/api/operation/list_software' in url for url in requests), 'picker downloaded the entire library'
+        page.goto(origin+'/#/attention?view=not_built&q=Scale%20application%20239')
+        expect(page.get_by_role('link',name='Scale application 239',exact=True)).to_be_visible()
+        page.reload()
+        expect(page.get_by_label('View',exact=True)).to_have_value('not_built')
+        expect(page.get_by_label('Search all applications',exact=True)).to_have_value('Scale application 239')
+        page.get_by_text('Worker queues by capability',exact=True).click()
+        expect(page.get_by_text('Active leases show current work. A compatible worker may already be busy.',exact=True)).to_be_visible()
+        page.set_viewport_size({'width':320,'height':800})
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'library overflows at 320px'
+        page.set_viewport_size({'width':1280,'height':900})
+        page.screenshot(path=str(Path(__file__).resolve().parents[1]/'target/library-ui.png'),full_page=True)

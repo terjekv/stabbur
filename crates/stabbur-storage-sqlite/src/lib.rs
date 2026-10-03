@@ -3,8 +3,10 @@
 mod artifacts;
 mod build_targets;
 mod catalog;
+mod exports;
 mod identity;
 mod jobs;
+mod library;
 mod operations;
 mod recipes;
 mod runs;
@@ -86,6 +88,20 @@ fn embedded_migrator() -> Migrator {
             Cow::Borrowed("operator workflows"),
             MigrationType::Simple,
             Cow::Borrowed(include_str!("../migrations/0002_operator_workflows.sql")),
+            false,
+        ),
+        Migration::new(
+            3,
+            Cow::Borrowed("saved exports"),
+            MigrationType::Simple,
+            Cow::Borrowed(include_str!("../migrations/0003_saved_exports.sql")),
+            false,
+        ),
+        Migration::new(
+            4,
+            Cow::Borrowed("software library"),
+            MigrationType::Simple,
+            Cow::Borrowed(include_str!("../migrations/0004_library.sql")),
             false,
         ),
     ];
@@ -2440,13 +2456,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fresh_schema_applies_baseline_and_operator_migration() {
+    async fn fresh_schema_applies_all_embedded_migrations() {
         let storage = storage().await;
         let migration_count: i64 = query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
             .fetch_one(storage.pool_for_tests())
             .await
             .unwrap();
-        assert_eq!(migration_count, 2);
+        assert_eq!(migration_count, 4);
         let catalog_table: i64 = query_scalar(
             "SELECT COUNT(*) FROM sqlite_schema
              WHERE type = 'table' AND name = 'recipe_catalog_snapshots'",
@@ -2717,6 +2733,23 @@ mod tests {
             created_at: now + Duration::seconds(1),
         };
         storage.enqueue_job(&compatible).await.unwrap();
+        let queues = storage.operational_status().await.unwrap();
+        assert!(!queues.capability_queues_truncated);
+        assert_eq!(queues.capability_queues.len(), 2);
+        let missing = queues
+            .capability_queues
+            .iter()
+            .find(|q| q.required_capabilities == unavailable)
+            .unwrap();
+        assert_eq!(missing.queued_jobs, 150);
+        assert_eq!(missing.matching_workers, 0);
+        let ready = queues
+            .capability_queues
+            .iter()
+            .find(|q| q.required_capabilities == available)
+            .unwrap();
+        assert_eq!(ready.matching_workers, 1);
+        assert_eq!(ready.workers_with_active_leases, 0);
 
         let claimed = storage
             .claim_job(worker, &available, now + Duration::seconds(2), 30)
@@ -2724,6 +2757,24 @@ mod tests {
             .unwrap()
             .expect("compatible work beyond the first queue window must be claimable");
         assert_eq!(claimed.job.id, compatible.id);
+        storage
+            .enqueue_job(&Job {
+                id: JobId::new(),
+                subject: JobSubject::BuildRun {
+                    run_id: RunId::new(),
+                },
+                ..compatible
+            })
+            .await
+            .unwrap();
+        let queues = storage.operational_status().await.unwrap();
+        let busy = queues
+            .capability_queues
+            .iter()
+            .find(|q| q.required_capabilities == available)
+            .unwrap();
+        assert_eq!(busy.matching_workers, 1);
+        assert_eq!(busy.workers_with_active_leases, 1);
     }
 
     #[tokio::test]
@@ -2897,6 +2948,23 @@ mod tests {
         }
 
         let storage = storage().await;
+        for (statement, index) in [
+            (
+                "SELECT id FROM software WHERE name > 'A' ORDER BY name, id LIMIT 51",
+                "software_library_name",
+            ),
+            (
+                "SELECT state FROM runs WHERE software_id = 'app' ORDER BY created_at DESC, id DESC LIMIT 1",
+                "runs_software_recent",
+            ),
+            (
+                "SELECT COUNT(*) FROM build_targets WHERE software_id = 'app' AND enabled = 1",
+                "targets_software_enabled",
+            ),
+        ] {
+            let actual = plan(&storage, statement).await;
+            assert!(actual.contains(index), "{actual}");
+        }
         let token = plan(
             &storage,
             "SELECT p.id FROM credentials c JOIN principals p ON p.id = c.principal_id

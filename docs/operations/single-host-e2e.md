@@ -32,6 +32,12 @@ See [GitHub's runner reference](https://docs.github.com/en/actions/reference/run
    Stabbur's `aarch64` to Munki's `arm64`.
 5. Munki 7.2.0 generates its catalog, schedules the fixture, installs it, and detects the exact
    payload and package receipt. A second check must schedule no reinstall.
+   The console then publishes its own authenticated repository through browser forms. A second
+   real AutoPkg run supplies a package upgrade from 1.0 to 2.0; Munki installs it and detects the
+   new receipt and payload. Browser withdrawal removes the repository entry and installer URL.
+   Another AutoPkg run supplies a generated application disk image; publication checks universal
+   architecture metadata, and Munki copies the application and detects it on a repeat check.
+   The test consumes the same configuration-profile settings downloaded by administrators.
 6. The stopped server's complete database and CAS are copied and restored into a new directory.
    The original credential, channel revision and artifact bytes must remain usable.
 7. A job is claimed but abandoned, the server receives `SIGKILL`, and a real restarted worker

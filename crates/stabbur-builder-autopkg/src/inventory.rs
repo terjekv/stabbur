@@ -5,11 +5,11 @@ use super::{
     PinnedSource, catalog_entry_from_document, is_recipe_path, parse_recipe_document,
     read_catalog_recipe,
 };
-use stabbur_builder_core::RecipeImportSources;
 use stabbur_builder_core::{
     RecipeCatalogDiagnostic, RecipeCatalogDiagnosticSeverity, RecipeCatalogEntry,
     RecipeCatalogManifest, RecipeCatalogSource,
 };
+use stabbur_builder_core::{RecipeCatalogGuidance, RecipeImportSources, RecipePurpose};
 use std::collections::BTreeSet;
 use std::{
     collections::BTreeMap,
@@ -103,6 +103,78 @@ fn has_external_processors(document: &serde_json::Value) -> bool {
         })
 }
 
+// These are observed effects of known processors, not a sandbox or safety guarantee.
+pub(super) fn document_purpose(document: &serde_json::Value) -> RecipePurpose {
+    // Windows signing workflows need a separately reviewed output definition, not a macOS preset.
+    if document
+        .get("Process")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|steps| {
+            steps.iter().any(|step| {
+                step.get("Processor").and_then(serde_json::Value::as_str)
+                    == Some("SignToolVerifier")
+            })
+        })
+    {
+        return RecipePurpose::Unknown;
+    }
+    document
+        .get("Process")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|step| step.get("Processor")?.as_str())
+        .map(|processor| match processor {
+            "InstallFromDMG" | "Installer" => RecipePurpose::Install,
+            "MunkiImporter"
+            | "JSSImporter"
+            | "JamfUploader"
+            | "JamfPackageUploader"
+            | "FileWaveImporter" => RecipePurpose::Publish,
+            "PkgCreator" | "AppPkgCreator" | "PkgCopier" => RecipePurpose::BuildArtifact,
+            "URLDownloader" | "CURLDownloader" | "URLDownloaderPython" => {
+                RecipePurpose::FetchArtifact
+            }
+            _ => RecipePurpose::Unknown,
+        })
+        .fold(RecipePurpose::Unknown, combine_purpose)
+}
+
+fn combine_purpose(left: RecipePurpose, right: RecipePurpose) -> RecipePurpose {
+    use RecipePurpose::{BuildArtifact, FetchArtifact, Install, Publish, Unknown};
+    match (left, right) {
+        (Install, _) | (_, Install) => Install,
+        (Publish, _) | (_, Publish) => Publish,
+        (BuildArtifact, _) | (_, BuildArtifact) => BuildArtifact,
+        (FetchArtifact, _) | (_, FetchArtifact) => FetchArtifact,
+        _ => Unknown,
+    }
+}
+
+fn chain_purpose(
+    identifier: &str,
+    observations: &BTreeMap<String, ObservedRecipe>,
+) -> RecipePurpose {
+    let mut visited = BTreeSet::new();
+    let mut current = identifier;
+    let mut purpose = RecipePurpose::Unknown;
+    loop {
+        if visited.len() >= MAX_RECIPE_TREE_DEPTH || !visited.insert(current) {
+            return purpose;
+        }
+        let Some(observed) = observations.get(current) else {
+            return purpose;
+        };
+        if let Some(guidance) = &observed.entry.guidance {
+            purpose = combine_purpose(purpose, guidance.purpose());
+        }
+        let Some(parent) = observed.entry.parents.first() else {
+            return purpose;
+        };
+        current = parent;
+    }
+}
+
 fn build_manifest(
     observations: &BTreeMap<String, ObservedRecipe>,
     duplicates: &BTreeSet<String>,
@@ -112,6 +184,13 @@ fn build_manifest(
     let mut diagnostics = Vec::new();
     for observed in observations.values() {
         let mut entry = observed.entry.clone();
+        if let Some(guidance) = &entry.guidance {
+            entry.guidance = RecipeCatalogGuidance::new(
+                guidance.name().to_owned(),
+                chain_purpose(&entry.identifier, observations),
+            )
+            .ok();
+        }
         match source_closure(&entry.identifier, observations, duplicates) {
             Ok(sources) => entry.import_sources = Some(sources),
             Err((code, detail)) => diagnostics.push(diagnostic(
@@ -406,11 +485,14 @@ pub(super) fn enrich_repository(
     }
     let manifest = build_manifest(&observations, &duplicates, &source.url)?;
     for entry in recipes {
-        entry.import_sources = manifest
+        if let Some(candidate) = manifest
             .recipes
             .iter()
             .find(|candidate| candidate.identifier == entry.identifier)
-            .and_then(|candidate| candidate.import_sources.clone());
+        {
+            entry.import_sources.clone_from(&candidate.import_sources);
+            entry.guidance.clone_from(&candidate.guidance);
+        }
     }
     diagnostics.extend(manifest.diagnostics);
     diagnostics.sort_by(|a, b| (&a.identifier, &a.code).cmp(&(&b.identifier, &b.code)));
@@ -424,6 +506,7 @@ mod tests {
     fn observed(id: &str, parent: Option<&str>, repo: &str) -> ObservedRecipe {
         ObservedRecipe {
             entry: RecipeCatalogEntry {
+                guidance: None,
                 identifier: id.into(),
                 builder: "autopkg".into(),
                 parents: parent.map(String::from).into_iter().collect(),
@@ -441,6 +524,48 @@ mod tests {
             parent_trust: parent.is_some(),
         }
     }
+    #[test]
+    fn purpose_follows_processors_and_parent_effects_instead_of_identifiers() {
+        let install = document_purpose(
+            &serde_json::json!({"Process":[{"Processor":"URLDownloader"},{"Processor":"InstallFromDMG"}]}),
+        );
+        assert_eq!(install, RecipePurpose::Install);
+        assert_eq!(
+            document_purpose(
+                &serde_json::json!({"Process":[{"Processor":"URLDownloader"},{"Processor":"SignToolVerifier"}]})
+            ),
+            RecipePurpose::Unknown
+        );
+        let mut rows = BTreeMap::from([
+            (
+                "example.download.App".into(),
+                observed("example.download.App", Some("parent"), "recipes"),
+            ),
+            ("parent".into(), observed("parent", None, "recipes")),
+        ]);
+        rows.get_mut("parent").unwrap().entry.guidance =
+            Some(RecipeCatalogGuidance::new("App".into(), install).unwrap());
+        rows.get_mut("example.download.App").unwrap().entry.guidance =
+            Some(RecipeCatalogGuidance::new("App".into(), RecipePurpose::Unknown).unwrap());
+        let manifest = build_manifest(&rows, &BTreeSet::new(), "fixture").unwrap();
+        assert_eq!(
+            manifest.recipes[0].guidance.as_ref().unwrap().purpose(),
+            RecipePurpose::Install
+        );
+        rows.get_mut("parent").unwrap().entry.guidance =
+            Some(RecipeCatalogGuidance::new("App".into(), RecipePurpose::FetchArtifact).unwrap());
+        assert_eq!(
+            chain_purpose("example.download.App", &rows),
+            RecipePurpose::FetchArtifact
+        );
+        assert_eq!(
+            document_purpose(
+                &serde_json::json!({"Process":[{"Processor":"URLDownloader"},{"Processor":"MunkiImporter"}]})
+            ),
+            RecipePurpose::Publish
+        );
+    }
+
     #[test]
     fn closures_preserve_overrides_and_reject_missing_ambiguous_or_dirty_parents() {
         let mut rows = BTreeMap::from([

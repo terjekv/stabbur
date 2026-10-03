@@ -110,6 +110,17 @@ pub struct SoftwareChannelStatusResponse {
     /// Channel concurrency revision.
     revision: u64,
 }
+
+impl From<stabbur_storage_core::SoftwareChannelSummary> for SoftwareChannelStatusResponse {
+    fn from(value: stabbur_storage_core::SoftwareChannelSummary) -> Self {
+        Self {
+            name: value.name,
+            release_id: value.release_id.to_string(),
+            version: value.version.to_string(),
+            revision: value.revision,
+        }
+    }
+}
 /// Target waiting for one recently observed worker matching all its capabilities.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BlockedTargetResponse {
@@ -194,6 +205,10 @@ pub(crate) async fn software_status(
 /// Durable queue and worker measurements; contains no backend paths or credentials.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct OperationalStatusResponse {
+    /// First 200 queued capability groups ordered by oldest work.
+    capability_queues: Vec<CapabilityQueueResponse>,
+    /// Further groups exist outside this bounded response.
+    capability_queues_truncated: bool,
     /// Jobs awaiting a worker.
     queued_jobs: u64,
     /// Jobs with a leased attempt.
@@ -222,6 +237,22 @@ pub(crate) async fn operational_status(
         .await
         .map_err(|error| ApiError::storage(error, &request_id))?;
     Ok(web::Json(OperationalStatusResponse {
+        capability_queues: value
+            .capability_queues
+            .into_iter()
+            .map(|group| CapabilityQueueResponse {
+                required_capabilities: group
+                    .required_capabilities
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+                queued_jobs: group.queued_jobs,
+                matching_workers: group.matching_workers,
+                workers_with_active_leases: group.workers_with_active_leases,
+                oldest_queued_at: group.oldest_queued_at,
+            })
+            .collect(),
+        capability_queues_truncated: value.capability_queues_truncated,
         queued_jobs: value.queued_jobs,
         running_jobs: value.running_jobs,
         failed_jobs: value.failed_jobs,
@@ -229,4 +260,19 @@ pub(crate) async fn operational_status(
         draining_workers: value.draining_workers,
         oldest_queued_at: value.oldest_queued_at,
     }))
+}
+
+/// Jobs grouped by exact capabilities, separating unavailable workers from active leases.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CapabilityQueueResponse {
+    /// Complete requirements matched on one worker.
+    required_capabilities: Vec<String>,
+    /// Queued jobs.
+    queued_jobs: u64,
+    /// Recent enabled non-draining compatible workers.
+    matching_workers: u64,
+    /// Compatible workers holding an unexpired lease; this is not configured capacity.
+    workers_with_active_leases: u64,
+    /// Oldest job in this group.
+    oldest_queued_at: chrono::DateTime<Utc>,
 }

@@ -152,7 +152,11 @@ uses `sudo` and may prompt for your macOS password. It installs AutoPkg system-w
 to replace an existing AutoPkg directory or package receipt. Stopping or removing the test setup
 does not uninstall AutoPkg. The default installer command never installs system packages.
 
-Munki is optional delivery tooling and is not installed or configured by this script. The CLI's
+The console's protected Munki repository is configured in private installation storage. Open
+**Munki delivery** after promoting a release to testing. Its loopback URL serves only this Mac;
+a separate test device requires a reachable HTTPS deployment of the console.
+
+Munki client tooling is optional and is not installed or configured by this script. The CLI's
 `munki-export` can export approved artifacts into a directory you select. For a disposable test
 that installs and detects a real package with Munki, use the separate
 [single-host E2E harness](single-host-e2e.md); its system-changing fixture is intended for a
@@ -177,6 +181,14 @@ Portable safety tests run in the normal static CI job:
 python3 scripts/test-macos-test-setup.py
 ```
 
+CI also exercises the default source-fetch path using the installer's exact companion pins. This
+checks all three API contracts against this server checkout before any compilation or service
+startup, including when the live installer tests use prebuilt binaries:
+
+```sh
+python3 scripts/test-macos-test-setup.py --source-contracts
+```
+
 The cross-repository macOS job also exercises a real installation using its compiled binaries and
 prepared AutoPkg. It verifies unusual/custom paths, private credentials, CLI and frontend login,
 worker registration, durable state across restart, repeated start/stop, and occupied-port refusal.
@@ -191,3 +203,14 @@ python3 scripts/test-macos-test-setup.py --live \
 ```
 
 Add `--autopkg /absolute/path/to/autopkg` to require and verify its worker capability too.
+
+For coordinated, unpublished onboarding changes, use the four sibling checkouts explicitly:
+
+```sh
+./scripts/install-test-macos.py --prefix /tmp/stabbur-onboarding install \
+  --workspace /path/to/workspace --web-port 3334 --api-port 9091
+```
+
+The installer validates the three API documents before building. Default companion pins must be
+updated together when these changes are published; an old frontend/client contract must never be
+accepted silently. The UI’s Firefox starter source supports a scan without local AutoPkg discovery.

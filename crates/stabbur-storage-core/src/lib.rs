@@ -1,5 +1,10 @@
 //! Aggregate- and operation-shaped storage capabilities and explicit transaction context.
 
+mod exports;
+pub use exports::*;
+mod library;
+pub use library::*;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -867,6 +872,12 @@ pub trait IdentityAdminStorage: Send + Sync {
 /// Persists software aggregates.
 #[async_trait]
 pub trait SoftwareStorage: Send + Sync {
+    /// Searches and filters before keyset pagination; returns at most limit + 1 summary rows.
+    async fn software_library(
+        &self,
+        query: &LibraryQuery,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<LibraryEntry>, StorageError>;
     /// Returns bounded execution and publication status for one software item.
     async fn software_status(
         &self,
@@ -1433,6 +1444,7 @@ pub trait Storage:
     + RunStorage
     + BuildStorage
     + CatalogStorage
+    + ExportStorage
     + RunLogStorage
     + JobStorage
     + AuditStorage
@@ -1511,6 +1523,10 @@ pub struct SoftwareStatus {
 /// Bounded durable queue and worker measurements for operators.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OperationalStatus {
+    /// First 200 queued capability groups, ordered by oldest work.
+    pub capability_queues: Vec<CapabilityQueue>,
+    /// True when further capability groups are omitted.
+    pub capability_queues_truncated: bool,
     /// Jobs waiting for a worker.
     pub queued_jobs: u64,
     /// Jobs with a leased attempt.
@@ -1523,4 +1539,19 @@ pub struct OperationalStatus {
     pub draining_workers: u64,
     /// Creation time of the oldest queued job.
     pub oldest_queued_at: Option<DateTime<Utc>>,
+}
+
+/// Queue pressure grouped by the exact complete requirements of a job.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CapabilityQueue {
+    /// All capabilities must be present on one worker.
+    pub required_capabilities: CapabilitySet,
+    /// Number of queued jobs with these requirements.
+    pub queued_jobs: u64,
+    /// Enabled non-draining matching workers observed within five minutes.
+    pub matching_workers: u64,
+    /// Matching workers that currently hold an unexpired lease; not a capacity estimate.
+    pub workers_with_active_leases: u64,
+    /// Oldest queued job in this group.
+    pub oldest_queued_at: DateTime<Utc>,
 }

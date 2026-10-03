@@ -289,7 +289,7 @@ async fn identity_administration_enforces_roles_revocation_and_password_recovery
 
     let human = test::TestRequest::post()
         .uri("/api/v1/auth/principals")
-        .insert_header(admin_auth)
+        .insert_header(admin_auth.clone())
         .set_json(serde_json::json!({
             "name": "operator-one",
             "kind": "human",
@@ -895,7 +895,7 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
         StatusCode::BAD_REQUEST
     );
 
-    let artifact_bytes = Bytes::from_static(b"verified AutoPkg package bytes");
+    let artifact_bytes = Bytes::from_static(b"xar!verified AutoPkg package bytes");
     let artifact_digest = Sha256Digest::new(hex::encode(Sha256::digest(&artifact_bytes))).unwrap();
     let attempt_id = claimed["lease"]["attempt_id"].as_str().unwrap();
     let upload = test::TestRequest::put()
@@ -997,6 +997,212 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
     assert_eq!(response.status(), StatusCode::CREATED);
     assert_eq!(response.headers().get(header::ETAG).unwrap(), "\"rev-1\"");
 
+    // The public export API consumes worker-published artifacts and keeps publication atomic.
+    macro_rules! export_json {
+        ($method:expr, $path:expr, $body:expr, $revision:expr, $status:expr) => {{
+            let request = test::TestRequest::default()
+                .method($method)
+                .uri($path)
+                .insert_header(admin_auth.clone())
+                .insert_header((header::IF_MATCH, format!("\"rev-{}\"", $revision)))
+                .set_json($body)
+                .to_request();
+            let response = test::call_service(&app, request).await;
+            let status = response.status();
+            let body: serde_json::Value = test::read_body_json(response).await;
+            assert_eq!(status, $status);
+            body
+        }};
+    }
+    use actix_web::http::Method;
+    let library = export_json!(
+        Method::GET,
+        "/api/v1/software/firefox",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    let mut definition = serde_json::json!({"slug":"staff","name":"Staff Macs","destination":"hosted","catalog":"production","selections":[{"software":library["id"],"source":{"kind":"channel","channel":"stable"},"architectures":[],"settings":{"format":"pkg","detection":{"kind":"receipt","package_id":"org.example.firefox"}}}]});
+    let saved = export_json!(
+        Method::POST,
+        "/api/v1/exports",
+        &definition,
+        0,
+        StatusCode::CREATED
+    );
+    let export_id = saved["id"].as_str().unwrap();
+    let plan = export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/plan",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(plan["ready"], true);
+    assert_eq!(plan["changes"][0]["action"], "add");
+    let published_export = export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/apply",
+        serde_json::json!({"fingerprint":plan["fingerprint"],"reviewed":true}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(published_export["snapshot"]["generation"], 1);
+    assert_eq!(
+        published_export["pkginfo"][0]["catalogs"],
+        serde_json::json!(["production"])
+    );
+    export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/apply",
+        serde_json::json!({"fingerprint":plan["fingerprint"],"reviewed":true}),
+        0,
+        StatusCode::CONFLICT
+    );
+    let unchanged = export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/plan",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(unchanged["changes"][0]["action"], "unchanged");
+    let reader = export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/readers",
+        serde_json::json!({}),
+        0,
+        StatusCode::CREATED
+    );
+    let reader_header = (
+        header::AUTHORIZATION,
+        format!(
+            "Basic {}",
+            STANDARD.encode(format!("stabbur:{}", reader["token"].as_str().unwrap()))
+        ),
+    );
+    let catalog_path = format!("/api/v1/exports/{export_id}/repository/catalogs/production");
+    let response = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri(&catalog_path)
+            .insert_header(reader_header.clone())
+            .to_request(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let xml = test::read_body(response).await;
+    let catalog = plist::Value::from_reader_xml(xml.as_ref()).unwrap();
+    assert_eq!(catalog.as_array().unwrap().len(), 1);
+    assert_eq!(
+        test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&catalog_path)
+                .insert_header(admin_auth.clone())
+                .to_request()
+        )
+        .await
+        .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    // A new second application with no release blocks the complete batch.
+    let second = export_json!(
+        Method::POST,
+        "/api/v1/software",
+        serde_json::json!({"slug":"not-built","name":"Not built"}),
+        0,
+        StatusCode::CREATED
+    );
+    let mut second_selection = definition["selections"][0].clone();
+    second_selection["software"] = second["id"].clone();
+    definition["selections"]
+        .as_array_mut()
+        .unwrap()
+        .push(second_selection);
+    export_json!(
+        Method::PUT,
+        "/api/v1/exports/staff",
+        &definition,
+        1,
+        StatusCode::OK
+    );
+    let blocked = export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/plan",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(blocked["ready"], false);
+    export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/apply",
+        serde_json::json!({"fingerprint":blocked["fingerprint"],"reviewed":true}),
+        0,
+        StatusCode::CONFLICT
+    );
+    // Even a resolvable plan cannot publish bytes of the wrong installer format.
+    definition["selections"].as_array_mut().unwrap().pop();
+    definition["selections"][0]["settings"] = serde_json::json!({"format":"dmg_app","detection":{"kind":"application","name":"Firefox.app","bundle_id":"org.mozilla.firefox"}});
+    export_json!(
+        Method::PUT,
+        "/api/v1/exports/staff",
+        &definition,
+        2,
+        StatusCode::OK
+    );
+    let bad_format = export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/plan",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(bad_format["ready"], true);
+    export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/apply",
+        serde_json::json!({"fingerprint":bad_format["fingerprint"],"reviewed":true}),
+        0,
+        StatusCode::BAD_REQUEST
+    );
+    let current = export_json!(
+        Method::GET,
+        "/api/v1/exports/staff",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(current["generation"], 1);
+    let history = export_json!(
+        Method::GET,
+        "/api/v1/exports/staff/history",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(history["items"].as_array().unwrap().len(), 1);
+    let revoke = test::TestRequest::post()
+        .uri("/api/v1/exports/staff/readers/revoke")
+        .insert_header(admin_auth.clone())
+        .to_request();
+    assert_eq!(
+        test::call_service(&app, revoke).await.status(),
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&catalog_path)
+                .insert_header(reader_header)
+                .to_request()
+        )
+        .await
+        .status(),
+        StatusCode::UNAUTHORIZED
+    );
     let stale_promotion = test::TestRequest::put()
         .uri("/api/v1/software/firefox/channels/stable")
         .insert_header((header::AUTHORIZATION, format!("Bearer {admin_token}")))
@@ -1135,7 +1341,7 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
 
     let disable = test::TestRequest::patch()
         .uri(&format!("/api/v1/workers/{worker_id}"))
-        .insert_header(admin_auth)
+        .insert_header(admin_auth.clone())
         .insert_header((header::IF_MATCH, "\"rev-2\""))
         .set_json(serde_json::json!({"enabled": false}))
         .to_request();
@@ -1156,6 +1362,79 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
             .await
             .status(),
         StatusCode::UNAUTHORIZED
+    );
+    // A withdrawal through the general release API must immediately affect hosted exports.
+    let active_reader = export_json!(
+        Method::POST,
+        "/api/v1/exports/staff/readers",
+        serde_json::json!({}),
+        0,
+        StatusCode::CREATED
+    );
+    let auth = (
+        header::AUTHORIZATION,
+        format!(
+            "Basic {}",
+            STANDARD.encode(format!(
+                "stabbur:{}",
+                active_reader["token"].as_str().unwrap()
+            ))
+        ),
+    );
+    let current_release = export_json!(
+        Method::GET,
+        &format!("/api/v1/releases/{release_id}"),
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    export_json!(
+        Method::POST,
+        &format!("/api/v1/releases/{release_id}/withdraw"),
+        serde_json::json!({"reason":"Export withdrawal contract"}),
+        current_release["revision"].as_u64().unwrap(),
+        StatusCode::OK
+    );
+    let response = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri(&catalog_path)
+            .insert_header(auth.clone())
+            .to_request(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(
+        plist::Value::from_reader_xml(test::read_body(response).await.as_ref())
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let package = format!("/api/v1/exports/staff/repository/pkgs/{artifact_digest}.pkg");
+    assert_eq!(
+        test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&package)
+                .insert_header(auth)
+                .to_request()
+        )
+        .await
+        .status(),
+        StatusCode::NOT_FOUND
+    );
+    let retained = export_json!(
+        Method::GET,
+        "/api/v1/exports/staff/snapshots/1",
+        serde_json::json!({}),
+        0,
+        StatusCode::OK
+    );
+    assert_eq!(retained["snapshot"]["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        retained["unavailable_releases"],
+        serde_json::json!([release_id])
     );
 }
 
@@ -1364,4 +1643,96 @@ async fn unauthenticated_requests_use_stable_problem_documents() {
     let problem: serde_json::Value = test::read_body_json(response).await;
     assert_eq!(problem["code"], "unauthorized");
     assert!(problem["request_id"].as_str().is_some());
+}
+
+#[actix_web::test]
+async fn library_filters_before_paging_and_binds_cursors_to_the_query() {
+    let (state, token, _temp) = authenticated_state().await;
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(state))
+            .configure(configure),
+    )
+    .await;
+    for (slug, name) in [
+        ("library", "Alpha"),
+        ("second", "Alpha"),
+        ("literal", "Percent %_"),
+    ] {
+        let response = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/api/v1/software")
+                .insert_header((header::AUTHORIZATION, format!("Bearer {token}")))
+                .set_json(serde_json::json!({"slug":slug,"name":name}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+    let anonymous = test::call_service(
+        &app,
+        test::TestRequest::get()
+            .uri("/api/v1/library/software")
+            .to_request(),
+    )
+    .await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    let get = |uri: &str| {
+        test::TestRequest::get()
+            .uri(uri)
+            .insert_header((header::AUTHORIZATION, format!("Bearer {token}")))
+            .to_request()
+    };
+    // Existing software slugs must not be shadowed by the new endpoint.
+    assert_eq!(
+        test::call_service(&app, get("/api/v1/software/library"))
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    let response = test::call_service(
+        &app,
+        get("/api/v1/library/software?q=alpha&limit=1&view=not_built"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let first: serde_json::Value = test::read_body_json(response).await;
+    assert_eq!(first["items"].as_array().unwrap().len(), 1);
+    assert_eq!(first["items"][0]["name"], "Alpha");
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let second: serde_json::Value = test::read_body_json(
+        test::call_service(
+            &app,
+            get(&format!(
+                "/api/v1/library/software?q=alpha&limit=1&view=not_built&cursor={cursor}"
+            )),
+        )
+        .await,
+    )
+    .await;
+    assert_ne!(first["items"][0]["id"], second["items"][0]["id"]);
+    assert!(second["next_cursor"].is_null());
+    for uri in [
+        format!("/api/v1/library/software?q=other&cursor={cursor}"),
+        "/api/v1/library/software?limit=201".into(),
+        "/api/v1/library/software?view=unknown".into(),
+        "/api/v1/library/software?q=bad%0Aquery".into(),
+    ] {
+        assert_eq!(
+            test::call_service(&app, get(&uri)).await.status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let literal: serde_json::Value = test::read_body_json(
+        test::call_service(&app, get("/api/v1/library/software?q=%25_")).await,
+    )
+    .await;
+    assert_eq!(literal["items"].as_array().unwrap().len(), 1);
+    assert_eq!(literal["items"][0]["slug"], "literal");
+    let attention: serde_json::Value = test::read_body_json(
+        test::call_service(&app, get("/api/v1/library/software?view=attention")).await,
+    )
+    .await;
+    assert!(attention["items"].as_array().unwrap().is_empty());
 }

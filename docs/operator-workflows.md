@@ -12,22 +12,27 @@ The console logs in with the same Stabbur account as the CLI through its server-
 2. Check `stabbur status` and `stabbur worker list`. In the console, inspect Workers. Confirm that
    the intended worker is enabled, recently observed, and advertises the capabilities required
    by the exact recipe revision. A successful login does not establish worker readiness.
-3. Add software and a reviewed recipe revision, or review and apply a catalog plan. Open the
-   software page and choose **Add build target**. Select the software, recipe and exact revision.
-   Start with a manual schedule. New console targets default to disabled.
-4. Review and enable the target, then select **Build now**. The console opens the run's progress,
+3. Choose **Add software from recipes**. Start with a reviewed Firefox, Thunderbird or VLC
+   preset, or select a recipe from a worker's inventory. Review the exact source commits and
+   import plan. This creates the software, recipe revision and a disabled manual build target.
+   Existing custom recipes can also be connected using **Add build target** on the software page.
+4. For a disabled manual target, choose **Review and build**, check its source pins and worker,
+   then **Enable and start build**. Existing enabled targets use **Build now**. The console opens the run's progress,
    replayed logs and verification result. The CLI equivalent is
    `stabbur target trigger NAME --idempotency-key UNIQUE_KEY --watch`.
 5. Follow **Review resulting release**. Check the exact version, verification evidence and
    platform variants, then promote to testing. The promotion preview shows the current and
    proposed channel selections. Validate installation and detection on a test device before
    promoting to stable.
-6. Resolve or export the stable installer using the reviewed delivery workflow below. Browser
-   publication alone does not install software on a device or update an existing Munki export.
+6. Open **Munki delivery** from the software page, publish the testing installer, and download
+   its test Mac profile. Install and check again on the test Mac before publishing to stable.
+   The CLI export workflow below also supports an existing Munki repository.
 
 Resource pages have shareable fragment URLs. Refresh and Back retain the selected resource.
-Search and status filters apply to the items loaded in the current view; **Load more** extends
-that set. Build targets show their own run history; global runs show software names and full IDs.
+The Library and Needs attention views search and filter the complete software catalog before
+pagination. Their URLs retain query, view, and sorting for sharing or bookmarking. Advanced resource
+lists still filter loaded items; **Load more** extends those lists. Build targets show their own run
+history; global runs show software names and full IDs.
 The console follows durable logs in bounded pages and can pause or resume updates. CLI watches
 remain the preferred option for unattended operation and exact exit-status handling.
 
@@ -106,27 +111,64 @@ objects or historical records. Repeat bounded passes when necessary.
 
 ## Export to Munki
 
-`stabbur munki-export <software> --channel stable --platform macos --architecture arm64
---macos 15.0 --extension pkg --pkginfo-template reviewed-pkginfo.json --output export` resolves one
-promoted installer, verifies a local SHA-256 download, and produces `pkgs/` and `pkgsinfo/` in a new
-directory. The version remains opaque. Export refuses to replace an existing directory.
+Build and approve releases into the software library first. In **Exports**, create a named
+selection, choose a hosted Munki repository or files for an existing repository, and select
+applications together. Each application follows an explicit channel or pins one exact release.
+Versions are opaque: a pin never silently advances because a different version looks newer.
 
-Provide a reviewed pkginfo JSON template (for example, converted from `makepkginfo` output), or store
-Munki-compatible install and detection dictionaries in the software metadata. Detection must include
-nonempty `installs` or `receipts`. The exporter owns name, exact version, SHA-256, rounded-up size in
-KiB, relative installer location, channel catalog and platform constraints. It removes template URL
-overrides. Installer behavior and detection metadata remain the packager's responsibility.
-See [Munki's supported keys](https://github.com/munki/munki/wiki/Supported-Pkginfo-Keys).
+Review installation settings once per application in the export. Supported installers are flat
+PKG files with application or receipt detection, and DMG files containing an application at the
+image root. The release version must match the installed application or receipt version. Library
+presets prefill reviewed recipe settings. Apple silicon and Intel variants retain their macOS
+bounds; overlapping variants block publication until a channel pins an unambiguous variant.
 
-Review the export, copy it into your existing protected Munki repository, run `makecatalogs`, add the
-item to a test manifest, and exercise `managedsoftwareupdate --checkonly` followed by an explicitly
-approved install on a disposable test Mac. Verify installed-state detection prevents repeat installs,
-verify the downloaded installer hash, and record the source pin, run, release, channel revision and
-client result. Stabbur credentials are never embedded in the export or shared with managed devices.
+**Save selection** updates the draft only. **Preview batch** shows added, updated, unchanged,
+removed and blocked applications. **Publish snapshot** verifies every installer's SHA-256, size
+and format before advancing the complete export atomically. Definition, release and channel
+changes invalidate the reviewed preview. Missing settings, unapproved releases and unavailable
+installers block the whole batch; the previous snapshot remains available. Following a channel
+selects its current approved release at preview time; publication is manual.
 
-Exports are snapshots: subsequent withdrawal in Stabbur does not retract an already exported Munki
-catalog. Remove or replace that item in the delivery repository and rebuild its catalogs as part of
-incident response. No exporter can retroactively stop a device that already obtained installer bytes.
+Hosted exports use one stable protected repository URL. Open **Destination setup** to download a
+system configuration profile for managed Macs with Munki installed. The normal profile offers the
+applications in Managed Software Center. The disposable-test profile requests every application.
+Profiles contain export-only reader credentials, never Stabbur login credentials; administrators
+can revoke all earlier profiles and distribute replacements. A loopback URL works only on that
+Mac; a deployed repository needs a reachable HTTPS origin. General API or CLI withdrawal filters
+the hosted catalog and denies its installer immediately. Already downloaded bytes cannot be recalled.
+
+For an existing Munki repository, download a complete snapshot. The archive contains `pkgs`,
+`pkgsinfo`, `catalogs` and provenance in `export.json`; it contains no manifests or credentials.
+Merge the selected files into the destination, regenerate its catalogs with `makecatalogs`, and
+continue managing assignments there. A later Stabbur withdrawal cannot retract an offline copy.
+
+The CLI uses the same saved definitions and plans:
+
+```sh
+stabbur exports list
+stabbur exports show staff-macs
+stabbur exports plan staff-macs --output reviewed-plan.json
+stabbur exports apply --plan-file reviewed-plan.json
+stabbur exports download staff-macs --output new-export
+stabbur exports profile staff-macs --output managed-macs.mobileconfig
+```
+
+`exports save --file definition.json` creates a draft. Updating one also requires `--export NAME
+--revision N` from `exports show`. Apply and profile creation require confirmation (`--yes` for
+reviewed automation). Downloads create `new-export/repository` and never replace an existing
+path. The definition JSON format is shown in [the example](examples/munki-export.json). Replace its
+software UUID with one from `stabbur software list`.
+
+The earlier console delivery screen remains under **Exports → Earlier Munki publications**, at
+its original repository URLs. Its local state is separate from saved server exports. For those
+legacy publications, an external API/CLI withdrawal still requires removal in the earlier screen.
+The single-installer `stabbur munki-export` command also remains available. Existing exports and
+profiles are not automatically migrated.
+
+Test on a disposable Mac: check for updates, install, open the application, and check again to
+ensure the installed version is detected. Also test upgrading from the previously deployed
+version. The acceptance suite exercises PKG installation, upgrades, DMG application copying,
+a two-application saved export, reader revocation and external withdrawal.
 
 ## Cross-repository checks
 
@@ -143,17 +185,27 @@ and installation remain covered by the separate macOS acceptance workflow.
 
 ## Discover and import AutoPkg recipes
 
-Open **Recipes → Import recipes** (also available from Workers). Choose a worker inventory,
-filter identifiers, select recipes, and review their parent relationships and exact Git sources.
-Supply software names, artifact architecture, minimum macOS when known, and the output variables.
-The default `pathname` selects a downloaded installer; use `pkg_path` for a generated package.
-The version variable defaults to `version`. Confirm these against the recipe before building.
+Open **Add software from recipes**. Choose an inventory, or use **Use reviewed starter recipes** and scan
+its displayed exact commit. Scan progress refreshes automatically. The picker groups recipes by
+software and shows Recommended, Artifact recipes, Needs setup, and All discovered views. Purpose is
+observed from known processors across the parent chain; it is neither a suffix guess nor an execution
+safety guarantee. Install and publish workflows are excluded from guided artifact import.
 
-**Review import plan** shows the proposed software, immutable recipe revisions and targets.
-Review the source pins, selectors and any existing resources the plan would update before applying.
-Every imported target starts disabled with a manual schedule. Parent trust is never accepted by
-importing, and no build is queued. Review the recipe's verification policy before enabling a target.
-A recipe with parents but no trust information should first get a committed, reviewed AutoPkg override.
+Configure each selected installer separately. Confirm architecture from the artifact, not the worker,
+and supply its version and installer output variables. The exact pinned FirefoxSignedPkg preset
+suggests `version` and `pathname`; Thunderbird and VLC have additional reviewed presets at that
+same source pin. Other recipes require reviewed mappings. Old snapshots without
+purpose metadata remain readable but must be rescanned for guided import. Parent trust requirements,
+missing dependencies and incomplete source closures prevent guided import in both UI and client.
+
+**Review sources and import plan** shows software, immutable recipe revisions and disabled manual
+targets. Inspect every source pin, selector and existing resource being updated before applying.
+Review and enable a target, build once, inspect its artifact and verification results, then promote
+or schedule. A failed trust check is shown above the run logs. Log streams are reconstructed separately
+per attempt so partial stderr and stdout chunks cannot corrupt one another's messages.
+
+A recipe with parents but no trust information first needs a reviewed AutoPkg override committed
+and published at an exact revision. Import never accepts trust or queues a build automatically.
 
 Enable local discovery on the worker account that owns the AutoPkg profile:
 
@@ -178,9 +230,8 @@ with an import blocker. Duplicate identifiers, missing parents, cycles, conflict
 and external processor dependencies also require attention. External processors currently need a
 manually reviewed catalog manifest with their complete source dependencies.
 
-To discover recipes without a configured local AutoPkg inventory, expand **Import from a repository
-URL**, enter an HTTPS URL and a full lowercase 40-character commit, and request a scan. An available
-AutoPkg worker performs the scan. Use **Check scan** to open the completed snapshot. Cross-repository
+To discover recipes without a configured local AutoPkg inventory, expand **Scan a recipe repository**, enter an HTTPS URL and a full lowercase 40-character commit, and request a scan. An available
+AutoPkg worker performs the scan. The console opens the completed snapshot automatically. Cross-repository
 parents require a worker inventory containing those parent repositories, or a manually reviewed
 catalog manifest. Older snapshots without import source closures must be refreshed by an updated worker.
 
@@ -191,3 +242,40 @@ failure does not prevent the worker from claiming builds; the worker retries on 
 Imported selectors use `/stabbur/outputs/<variable>`, the final value of each output variable across
 one isolated run receipt. Ambiguous multiple receipts provide no normalized outputs and the build
 fails validation instead of guessing an installer. Existing explicit receipt selectors remain supported.
+
+## Library and attention workflow
+
+Open **Library** to search applications by display name or slug. **Needs attention** and its preset
+views select current failing checks, missing compatible workers, or available candidate releases.
+Historical failures stop appearing after a successful replacement check. A running replacement is
+shown as outstanding work. Channel selections, build state, and review status remain separate.
+
+Select explicit applications across pages and searches, then **Create export from selection**.
+The 100-application limit applies across the entire selection. The export editor's **Selected
+applications** view retains choices independently of search pages. Configure installation settings,
+save the draft, preview the batch, then publish through the existing concurrency and eligibility
+checks. Saving a draft never changes delivery.
+
+The CLI provides the same search and attention predicates:
+
+```sh
+stabbur software search firefox --view review
+stabbur --json software search --view attention --all
+stabbur software search --sort newest --limit 50
+```
+
+Search uses literal substrings with ASCII case folding. Sort by display name or creation identity;
+software versions remain opaque. Cursors belong to their original query and cannot be reused with
+a different search, view, or sort. Lists are live observations, not a frozen database snapshot.
+
+In **Exports**, check a saved selection for publication changes. Open **Publication history** to
+compare an earlier snapshot and restore its exact release selection as a draft. The current export
+name, destination, and catalog stay in place. Preview and publish separately; withdrawn releases
+remain unavailable. Restoring repository content does not reverse installations already performed.
+
+Worker queue diagnostics group requirements that must match on a single worker. Active leases
+indicate work in progress, not a guaranteed concurrency limit. The existing recurring scheduler
+coalesces outstanding target runs and skips missed intervals.
+
+See [operator scale decisions](architecture/operator-scale.md) for accepted follow-on work and its
+measurement or policy prerequisites.

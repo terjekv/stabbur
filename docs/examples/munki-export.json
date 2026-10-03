@@ -1,0 +1,27 @@
+{
+  "slug": "staff-macs",
+  "name": "Staff Macs",
+  "destination": "hosted",
+  "catalog": "production",
+  "selections": [
+    {
+      "software": "01900000-0000-7000-8000-000000000001",
+      "source": {
+        "kind": "channel",
+        "channel": "stable"
+      },
+      "architectures": [],
+      "settings": {
+        "format": "pkg",
+        "detection": {
+          "kind": "application",
+          "name": "Firefox.app",
+          "bundle_id": "org.mozilla.firefox"
+        },
+        "display_name": "Firefox",
+        "description": "Web browser",
+        "category": "Internet"
+      }
+    }
+  ]
+}

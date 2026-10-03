@@ -24,6 +24,27 @@ spec.loader.exec_module(installer)
 
 
 class SafetyTests(unittest.TestCase):
+    def test_companion_contract_drift_is_rejected_even_when_versions_match(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            checkouts = {name: base / name for name in ('stabbur', *installer.COMPANIONS)}
+            paths = [checkouts[name] / relative for name, relative in (
+                ('stabbur', 'docs/openapi.json'),
+                ('stabbur-client-rust', 'openapi/openapi.json'),
+                ('stabbur-frontend', 'contract/openapi.json'))]
+            contract = {'info': {'version': '0.0.1'}, 'components': {'schemas': {}}}
+            for path in paths:
+                path.parent.mkdir(parents=True)
+                path.write_text(json.dumps(contract))
+            installer.validate_contracts(checkouts)
+            changed = {**contract, 'components': {'schemas': {'NewResource': {'type': 'object'}}}}
+            for name, path in zip(('stabbur-client-rust', 'stabbur-frontend'), paths[1:]):
+                with self.subTest(companion=name):
+                    path.write_text(json.dumps(changed))
+                    with self.assertRaisesRegex(installer.SetupError, name):
+                        installer.validate_contracts(checkouts)
+                    path.write_text(json.dumps(contract))
+
     def test_existing_paths_and_symlinks_are_never_replaced(self):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -105,6 +126,19 @@ class SafetyTests(unittest.TestCase):
                 args = loaded.service(component)
                 self.assertEqual(args[:2], ['/usr/bin/env', '-i'])
                 self.assertNotIn('0.0.0.0', ' '.join(args))
+
+
+def source_contracts():
+    """Exercise the installer's default fetch path without compiling or starting services."""
+    with tempfile.TemporaryDirectory(prefix='stabbur-installer-sources-') as temporary:
+        base = Path(temporary)
+        sources = base / 'sources'
+        sources.mkdir()
+        env = {key: value for key, value in os.environ.items() if not key.startswith('STABBUR_')}
+        env['GIT_TERMINAL_PROMPT'] = '0'
+        with (base / 'fetch.log').open('wb') as log:
+            installer.prepare_sources(None, sources, env, log)
+    print('Pinned installer sources match the server, client and frontend API contracts.')
 
 
 def free_ports():
@@ -234,13 +268,18 @@ def live(args):
 
 if __name__ == '__main__':
     options = argparse.ArgumentParser(description=__doc__)
-    options.add_argument('--live', action='store_true')
+    mode = options.add_mutually_exclusive_group()
+    mode.add_argument('--live', action='store_true')
+    mode.add_argument('--source-contracts', action='store_true',
+                      help='Fetch the default companion pins and check contracts without installing')
     options.add_argument('--server', type=Path, default=Path('target/debug/stabbur-server').resolve())
     options.add_argument('--cli', type=Path, default=Path('target/debug/stabbur').resolve())
     options.add_argument('--frontend', type=Path, default=Path('target/debug/stabbur-frontend').resolve())
     options.add_argument('--autopkg', type=Path)
     arguments = options.parse_args()
-    if arguments.live:
+    if arguments.source_contracts:
+        source_contracts()
+    elif arguments.live:
         live(arguments)
     else:
         unittest.main(argv=[sys.argv[0]])

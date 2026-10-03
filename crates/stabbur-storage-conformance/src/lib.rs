@@ -81,6 +81,8 @@ pub async fn assert_storage_contract(storage: Arc<dyn Storage>) {
     )
     .await;
 
+    assert_library_contract(&storage, &software, now).await;
+
     let events = storage
         .audit_events(None, 200)
         .await
@@ -956,6 +958,7 @@ async fn assert_recipe_catalog_contract(
         },
         recipes: vec![
             RecipeCatalogEntry {
+                guidance: None,
                 import_sources: None,
                 identifier: "com.example.alpha".into(),
                 builder: "contract-run".into(),
@@ -963,6 +966,7 @@ async fn assert_recipe_catalog_contract(
                 required_capabilities: capabilities.clone(),
             },
             RecipeCatalogEntry {
+                guidance: None,
                 import_sources: None,
                 identifier: "com.example.beta".into(),
                 builder: "contract-run".into(),
@@ -1155,6 +1159,7 @@ async fn assert_recipe_catalog_scan_contract(
         producer: "contract-run".into(),
         source,
         recipes: vec![RecipeCatalogEntry {
+            guidance: None,
             import_sources: None,
             identifier: "com.example.scanned".into(),
             builder: "contract-run".into(),
@@ -1507,6 +1512,18 @@ async fn assert_build_catalog_contract(
         .expect("candidate channel lookup must succeed")
         .expect("candidate channel must advance automatically");
     assert_eq!(candidate.release_id, completion.release.id);
+    let library_query = stabbur_storage_core::LibraryQuery::new(
+        stabbur_storage_core::LibrarySearch::new(software.slug.to_string()).unwrap(),
+        stabbur_storage_core::LibraryView::Review,
+        stabbur_storage_core::LibrarySort::Name,
+        None,
+        1,
+    )
+    .unwrap();
+    let review = storage.software_library(&library_query, now).await.unwrap();
+    assert_eq!(review.len(), 1);
+    assert_eq!(review[0].review_count, 1);
+    assert_eq!(review[0].review_release_id, Some(completion.release.id));
 
     let exact_time = now + Duration::seconds(2);
     let (exact_run, exact_claim) = prepare_build_attempt(
@@ -1748,6 +1765,7 @@ async fn assert_build_catalog_contract(
         .expect("promoted release must exist");
     assert_eq!(testing_release.state, ReleaseState::Testing);
     assert_eq!(testing_release.revision, 2);
+    assert_export_contract(storage, principal, software, &testing_release, now).await;
     assert_eq!(
         storage
             .promote_channel(
@@ -1819,6 +1837,13 @@ async fn assert_build_catalog_contract(
         "withdrawal preserves the attained lifecycle"
     );
     assert!(!withdrawn.availability.is_available());
+    assert!(
+        storage
+            .software_library(&library_query, now)
+            .await
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(withdrawn.revision, stable.revision + 1);
     assert!(storage.channels(software.id).await.unwrap().is_empty());
     assert!(
@@ -2393,4 +2418,249 @@ async fn assert_job_contract(storage: &Arc<dyn Storage>, now: DateTime<Utc>) {
             .expect("idempotent replay must succeed"),
         CompletionOutcome::Replayed
     );
+}
+
+/// Saved export semantics every relational adapter must provide.
+#[allow(clippy::too_many_lines)] // One complete saved-export transaction and credential lifecycle contract.
+async fn assert_export_contract(
+    storage: &Arc<dyn Storage>,
+    principal: &Principal,
+    software: &Software,
+    release: &stabbur_domain::Release,
+    now: DateTime<Utc>,
+) {
+    use stabbur_domain::{
+        ExportId,
+        exports::{
+            ExportBinding, ExportDefinition, ExportDestination, ExportItem, ExportSelection,
+            ExportSettings, ExportSource, PreparedExport, RawExportDefinition,
+        },
+    };
+    let software = storage
+        .software(&software.id.to_string())
+        .await
+        .unwrap()
+        .unwrap();
+    let variants = storage.release_variants(release.id).await.unwrap();
+    let variant = &variants[0];
+    let artifact = storage
+        .variant_artifacts(variant.id)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|a| a.role == ArtifactRole::PrimaryInstaller)
+        .unwrap()
+        .artifact;
+    let settings:ExportSettings=serde_json::from_value(serde_json::json!({"format":"pkg","detection":{"kind":"receipt","package_id":"org.example.contract"}})).unwrap();
+    let definition = ExportDefinition::try_from(RawExportDefinition {
+        slug: SoftwareSlug::new("contract-export").unwrap(),
+        name: "Shared saved export".into(),
+        destination: ExportDestination::Hosted,
+        catalog: SoftwareSlug::new("production").unwrap(),
+        selections: vec![ExportSelection {
+            software: software.id,
+            source: ExportSource::Release {
+                release: release.id,
+            },
+            architectures: vec![],
+            settings: Some(settings.clone()),
+        }],
+    })
+    .unwrap();
+    let id = ExportId::new();
+    let audit = || contract_audit(principal, "export.contract", "export", id.to_string(), now);
+    let saved = storage
+        .create_export(id, &definition, &audit())
+        .await
+        .unwrap();
+    assert_eq!(saved.revision, 1);
+    assert_eq!(saved.generation, 0);
+    assert_eq!(
+        storage.export("contract-export").await.unwrap().unwrap().id,
+        id
+    );
+    assert!(
+        storage
+            .create_export(ExportId::new(), &definition, &audit())
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        storage.update_export(id, &definition, 0, &audit()).await,
+        Err(StorageError::StaleRevision)
+    );
+    let architecture = variant.compatibility.architecture;
+    let item = ExportItem {
+        software: software.id,
+        slug: software.slug.clone(),
+        name: software.name.clone(),
+        release: release.id,
+        version: release.version.clone(),
+        variant: variant.id,
+        architecture,
+        architectures: if architecture == Architecture::Universal {
+            vec![Architecture::Aarch64, Architecture::X86_64]
+        } else {
+            vec![architecture]
+        },
+        minimum_macos: variant.compatibility.minimum_macos.clone(),
+        maximum_macos: variant.compatibility.maximum_macos.clone(),
+        digest: artifact.digest,
+        size: artifact.size,
+        settings,
+    };
+    let binding = ExportBinding {
+        software: software.id,
+        software_revision: software.revision,
+        release: release.id,
+        release_revision: release.revision,
+        channel: None,
+    };
+    let publication = PreparedExport::new(id, 1, 0, vec![item], vec![binding]).unwrap();
+    let first_audit = audit();
+    let second_audit = audit();
+    let (first, second) = futures_util::join!(
+        storage.apply_export(&publication, &first_audit),
+        storage.apply_export(&publication, &second_audit)
+    );
+    assert_ne!(
+        first.is_ok(),
+        second.is_ok(),
+        "concurrent publication has exactly one winner"
+    );
+    let failed = if first.is_ok() { second } else { first };
+    assert_eq!(failed, Err(StorageError::StaleRevision));
+    let snapshot = storage.export_snapshot(id, 1).await.unwrap().unwrap();
+    assert_eq!(snapshot.items.len(), 1);
+    assert_eq!(storage.export_history(id, 0, 1).await.unwrap().len(), 1);
+    assert!(storage.export_history(id, 1, 1).await.unwrap().is_empty());
+    let mut raw = definition.data().clone();
+    raw.selections.clear();
+    let empty = ExportDefinition::try_from(raw).unwrap();
+    storage
+        .update_export(id, &empty, 1, &audit())
+        .await
+        .unwrap();
+    assert_eq!(
+        storage.apply_export(&publication, &audit()).await,
+        Err(StorageError::StaleRevision)
+    );
+    assert_eq!(
+        storage.export_snapshot(id, 1).await.unwrap().unwrap(),
+        snapshot,
+        "editing keeps immutable publication history"
+    );
+    let emptied = PreparedExport::new(id, 2, 1, vec![], vec![]).unwrap();
+    assert!(
+        storage
+            .apply_export(&emptied, &audit())
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    let (_, reader) = generate_token();
+    storage
+        .create_export_reader(id, &reader, &audit())
+        .await
+        .unwrap();
+    assert!(storage.export_reader_valid(id, &reader).await.unwrap());
+    assert!(
+        !storage
+            .export_reader_valid(ExportId::new(), &reader)
+            .await
+            .unwrap()
+    );
+    storage.revoke_export_readers(id, &audit()).await.unwrap();
+    assert!(!storage.export_reader_valid(id, &reader).await.unwrap());
+    let (_, replacement) = generate_token();
+    storage
+        .create_export_reader(id, &replacement, &audit())
+        .await
+        .unwrap();
+    assert!(storage.export_reader_valid(id, &replacement).await.unwrap());
+    assert_eq!(storage.export_history(id, 0, 200).await.unwrap().len(), 2);
+}
+
+async fn assert_library_contract(
+    storage: &Arc<dyn Storage>,
+    existing: &Software,
+    now: DateTime<Utc>,
+) {
+    use stabbur_storage_core::{
+        LibraryPosition, LibraryQuery, LibrarySearch, LibrarySort, LibraryView,
+    };
+    // More than one server page; repeated display names require an identity tie-breaker.
+    let mut tx = storage.begin().await.unwrap();
+    for index in 0..240 {
+        tx.create_software(&Software {
+            id: SoftwareId::new(),
+            slug: SoftwareSlug::new(format!("library-fixture-{index:03}")).unwrap(),
+            name: format!("Library fixture {:03}", index / 2),
+            created_at: now,
+            revision: 1,
+        })
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+    let search = LibrarySearch::new("library-fixture".into()).unwrap();
+    let mut after = None;
+    let mut ids = std::collections::BTreeSet::new();
+    loop {
+        let request = LibraryQuery::new(
+            search.clone(),
+            LibraryView::NotBuilt,
+            LibrarySort::Name,
+            after,
+            37,
+        )
+        .unwrap();
+        let mut page = storage.software_library(&request, now).await.unwrap();
+        assert!(page.len() <= 38);
+        let more = page.len() > 37;
+        page.truncate(37);
+        for row in &page {
+            assert!(
+                ids.insert(row.software.id),
+                "cursor must not repeat tied names"
+            );
+            assert!(row.latest_run_id.is_none());
+            assert_eq!(row.review_count, 0);
+        }
+        if !more {
+            break;
+        }
+        let last = page.last().unwrap();
+        after = Some(LibraryPosition::new(last.software.name.clone(), last.software.id).unwrap());
+    }
+    assert_eq!(ids.len(), 240);
+    let query = LibraryQuery::new(
+        LibrarySearch::new("library-fixture-239".into()).unwrap(),
+        LibraryView::NotBuilt,
+        LibrarySort::Newest,
+        None,
+        1,
+    )
+    .unwrap();
+    let result = storage.software_library(&query, now).await.unwrap();
+    assert_eq!(result.len(), 1, "search is applied before the first page");
+    let status = storage.software_status(existing.id, now).await.unwrap();
+    let query = LibraryQuery::new(
+        LibrarySearch::new(existing.slug.to_string()).unwrap(),
+        LibraryView::All,
+        LibrarySort::Name,
+        None,
+        200,
+    )
+    .unwrap();
+    let result = storage.software_library(&query, now).await.unwrap();
+    let item = result
+        .iter()
+        .find(|r| r.software.id == existing.id)
+        .unwrap();
+    assert_eq!(item.channels, status.channels);
+    assert_eq!(item.latest_run_state, status.latest_run.map(|r| r.state));
+    assert_eq!(item.last_success_at, status.last_success_at);
+    assert_eq!(item.outstanding_runs, status.outstanding_runs);
 }

@@ -1281,6 +1281,493 @@
         ]
       }
     },
+    "/api/v1/exports": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "list_exports",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor from a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50 and maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved export page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "create_export",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportDefinitionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Saved draft export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "get_export",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved definition and published generation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "update_export",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportDefinitionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "New draft definition revision; publication unchanged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}/apply": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "apply_export",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Entire reviewed snapshot published atomically",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportSnapshotView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Preview changed or contains blockers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}/history": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "list_export_history",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Append-only publication history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportHistoryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}/plan": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "plan_export",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read-only batch preview with blockers and exact fingerprint",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportPlanResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}/readers": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "create_export_reader",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "One-time export-only device credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportReaderResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}/readers/revoke": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "revoke_export_readers",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "All earlier device profiles revoked"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}/repository/{kind}/{name}": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "export_repository",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published catalog, manifest, pkginfo, or installer bytes",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "401": {
+            "description": "Export-only Basic credential required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "export_reader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{export}/snapshots/{generation}": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "get_export_snapshot",
+        "parameters": [
+          {
+            "name": "export",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "generation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable snapshot with current withdrawal eligibility",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportSnapshotView"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/jobs": {
       "get": {
         "tags": [
@@ -1359,6 +1846,101 @@
           },
           "404": {
             "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/library/software": {
+      "get": {
+        "tags": [
+          "software"
+        ],
+        "operationId": "software_library",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Literal name/slug substring; ASCII case-insensitive, at most 200 UTF-8 bytes.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "description": "all (default), attention, failed, blocked, review, or not_built.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "name (default, code-point order) or newest (creation identity descending). Never version order.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque keyset cursor bound to the search, view, and sort.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, default 50, maximum 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered software summaries and actionable attention",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query or cursor from a different query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Software read permission required",
             "content": {
               "application/json": {
                 "schema": {
@@ -3671,6 +4253,22 @@
           }
         }
       },
+      "ApplyExportRequest": {
+        "type": "object",
+        "required": [
+          "fingerprint",
+          "reviewed"
+        ],
+        "properties": {
+          "fingerprint": {
+            "type": "string"
+          },
+          "reviewed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ArtifactLocationList": {
         "type": "object",
         "description": "Independently tracked artifact locations.",
@@ -4023,6 +4621,49 @@
           }
         ],
         "description": "Manual or fixed-interval target schedule."
+      },
+      "CapabilityQueueResponse": {
+        "type": "object",
+        "description": "Jobs grouped by exact capabilities, separating unavailable workers from active leases.",
+        "required": [
+          "required_capabilities",
+          "queued_jobs",
+          "matching_workers",
+          "workers_with_active_leases",
+          "oldest_queued_at"
+        ],
+        "properties": {
+          "matching_workers": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Recent enabled non-draining compatible workers.",
+            "minimum": 0
+          },
+          "oldest_queued_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Oldest job in this group."
+          },
+          "queued_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Queued jobs.",
+            "minimum": 0
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Complete requirements matched on one worker."
+          },
+          "workers_with_active_leases": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Compatible workers holding an unexpired lease; this is not configured capacity.",
+            "minimum": 0
+          }
+        }
       },
       "ChangePasswordRequest": {
         "type": "object",
@@ -4377,6 +5018,507 @@
         },
         "additionalProperties": false
       },
+      "ExportChange": {
+        "type": "object",
+        "required": [
+          "software",
+          "name",
+          "action",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "add, update, unchanged, remove, or blocked."
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "software": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ExportDefinitionInput": {
+        "type": "object",
+        "description": "Complete saved definition; settings may be omitted in a draft, but block publication.",
+        "required": [
+          "slug",
+          "name",
+          "destination",
+          "catalog",
+          "selections"
+        ],
+        "properties": {
+          "catalog": {
+            "type": "string",
+            "description": "Munki catalog name, independently chosen from Stabbur selection channels."
+          },
+          "destination": {
+            "$ref": "#/components/schemas/ExportDestinationInput"
+          },
+          "name": {
+            "type": "string"
+          },
+          "selections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportSelectionInput"
+            }
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExportDestinationInput": {
+        "type": "string",
+        "enum": [
+          "hosted",
+          "download"
+        ]
+      },
+      "ExportDetectionInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "name",
+              "bundle_id",
+              "kind"
+            ],
+            "properties": {
+              "bundle_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "application"
+                ]
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "package_id",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "receipt"
+                ]
+              },
+              "package_id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ExportFormatInput": {
+        "type": "string",
+        "enum": [
+          "pkg",
+          "dmg_app"
+        ]
+      },
+      "ExportHistoryResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportSnapshotResponse"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ExportItemResponse": {
+        "type": "object",
+        "required": [
+          "software",
+          "slug",
+          "name",
+          "release",
+          "version",
+          "variant",
+          "architecture",
+          "architectures",
+          "digest",
+          "size",
+          "settings"
+        ],
+        "properties": {
+          "architecture": {
+            "type": "string"
+          },
+          "architectures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "digest": {
+            "type": "string"
+          },
+          "maximum_macos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minimum_macos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "release": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ExportSettingsInput"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "slug": {
+            "type": "string"
+          },
+          "software": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "variant": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ExportPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportResponse"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ExportPlanResponse": {
+        "type": "object",
+        "required": [
+          "export",
+          "definition_revision",
+          "published_generation",
+          "fingerprint",
+          "ready",
+          "changes",
+          "items"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportChange"
+            }
+          },
+          "definition_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "export": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Exact comparison token; apply recomputes it and rejects changed facts."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportItemResponse"
+            }
+          },
+          "published_generation": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExportReaderResponse": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "One-time repository-only credential. Download, never render or log."
+          }
+        }
+      },
+      "ExportResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "definition",
+          "revision",
+          "generation",
+          "updated_at"
+        ],
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/ExportDefinitionInput"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExportSelectionInput": {
+        "type": "object",
+        "required": [
+          "software",
+          "source"
+        ],
+        "properties": {
+          "architectures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Empty means both Mac hardware architectures."
+          },
+          "settings": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExportSettingsInput"
+              }
+            ]
+          },
+          "software": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExportSourceInput"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExportSettingsInput": {
+        "type": "object",
+        "required": [
+          "format",
+          "detection"
+        ],
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "detection": {
+            "$ref": "#/components/schemas/ExportDetectionInput"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ExportFormatInput"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExportSnapshotResponse": {
+        "type": "object",
+        "required": [
+          "export",
+          "generation",
+          "definition_revision",
+          "definition",
+          "items",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ExportDefinitionInput"
+          },
+          "definition_revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "export": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportItemResponse"
+            }
+          }
+        }
+      },
+      "ExportSnapshotView": {
+        "type": "object",
+        "required": [
+          "snapshot",
+          "unavailable_releases",
+          "pkginfo"
+        ],
+        "properties": {
+          "pkginfo": {
+            "type": "array",
+            "items": {},
+            "description": "Destination pkginfo, rendered from the snapshot by the server."
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ExportSnapshotResponse"
+          },
+          "unavailable_releases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Withdrawn or rejected releases; clients must not materialize them."
+          }
+        }
+      },
+      "ExportSourceInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "channel",
+              "kind"
+            ],
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "channel"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "release",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "release"
+                ]
+              },
+              "release": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ]
+      },
       "InstallationMetadata": {
         "type": "object",
         "description": "Declarative, platform-neutral installation and detection metadata.",
@@ -4540,6 +5682,131 @@
           }
         }
       },
+      "LibraryEntryResponse": {
+        "type": "object",
+        "description": "Library summary with separate execution, approval, and publication observations.",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "revision",
+          "created_at",
+          "channels",
+          "outstanding_runs",
+          "blocked_targets",
+          "review_count"
+        ],
+        "properties": {
+          "blocked_targets": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Enabled targets without a recent compatible worker.",
+            "minimum": 0
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SoftwareChannelStatusResponse"
+            },
+            "description": "Current channel selections, not evidence of installation on a device."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Software creation time."
+          },
+          "id": {
+            "type": "string",
+            "description": "Software identity."
+          },
+          "last_success_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Most recent successful check."
+          },
+          "latest_run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Latest run identity."
+          },
+          "latest_run_state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Latest run state; historical failures do not overwrite later success."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "next_run_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Next enabled recurring check."
+          },
+          "outstanding_runs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Queued or running builds.",
+            "minimum": 0
+          },
+          "review_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Available candidate releases awaiting review.",
+            "minimum": 0
+          },
+          "review_release_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Most recently created available candidate."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Software concurrency revision.",
+            "minimum": 0
+          },
+          "slug": {
+            "type": "string",
+            "description": "Stable software slug."
+          }
+        }
+      },
+      "LibraryPageResponse": {
+        "type": "object",
+        "description": "A bounded library page. No false next-page cursor when the collection is exhausted.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LibraryEntryResponse"
+            },
+            "description": "Current summary rows."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Continuation for the same query; null at exhaustion."
+          }
+        }
+      },
       "LivenessResponse": {
         "type": "object",
         "description": "Liveness response.",
@@ -4599,6 +5866,8 @@
         "type": "object",
         "description": "Durable queue and worker measurements; contains no backend paths or credentials.",
         "required": [
+          "capability_queues",
+          "capability_queues_truncated",
           "queued_jobs",
           "running_jobs",
           "failed_jobs",
@@ -4606,6 +5875,17 @@
           "draining_workers"
         ],
         "properties": {
+          "capability_queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityQueueResponse"
+            },
+            "description": "First 200 queued capability groups ordered by oldest work."
+          },
+          "capability_queues_truncated": {
+            "type": "boolean",
+            "description": "Further groups exist outside this bounded response."
+          },
           "draining_workers": {
             "type": "integer",
             "format": "int64",
@@ -4903,6 +6183,17 @@
             "type": "string",
             "description": "Stable builder adapter selector."
           },
+          "guidance": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecipeCatalogGuidanceResponse",
+                "description": "Observed display hints, never a safety or readiness guarantee. Absent in legacy snapshots."
+              }
+            ]
+          },
           "identifier": {
             "type": "string",
             "description": "Builder-owned stable identifier or entrypoint."
@@ -4930,6 +6221,24 @@
               "type": "string"
             },
             "description": "Capabilities required to execute this recipe."
+          }
+        }
+      },
+      "RecipeCatalogGuidanceResponse": {
+        "type": "object",
+        "description": "Bounded recipe display metadata observed by a worker.",
+        "required": [
+          "name",
+          "purpose"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name derived from the recipe filename, never its input values."
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/RecipePurposeResponse",
+            "description": "Observed processing intent across the parent chain."
           }
         }
       },
@@ -5311,6 +6620,17 @@
             "description": "Opaque next cursor."
           }
         }
+      },
+      "RecipePurposeResponse": {
+        "type": "string",
+        "description": "Observed recipe intent; custom processors may have additional effects.",
+        "enum": [
+          "fetch_artifact",
+          "build_artifact",
+          "install",
+          "publish",
+          "unknown"
+        ]
       },
       "RecipeResponse": {
         "type": "object",
@@ -6491,6 +7811,10 @@
       "bearer_auth": {
         "type": "http",
         "scheme": "bearer"
+      },
+      "export_reader": {
+        "type": "http",
+        "scheme": "basic"
       }
     }
   },
@@ -6554,6 +7878,10 @@
     {
       "name": "audit",
       "description": "Append-only audit evidence"
+    },
+    {
+      "name": "exports",
+      "description": "Saved selection, batch preview, atomic publication and Munki delivery"
     },
     {
       "name": "system",

@@ -9,7 +9,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use stabbur_builder_core::{
     BuildResult, RecipeCatalogDiagnostic, RecipeCatalogDiagnosticSeverity, RecipeCatalogEntry,
-    RecipeCatalogManifest, RecipeCatalogSource, SourceProvenance, VerificationResult,
+    RecipeCatalogGuidance, RecipeCatalogManifest, RecipeCatalogSource, SourceProvenance,
+    VerificationResult,
 };
 use stabbur_domain::{Architecture, ArtifactRole, MacOsVersion, Platform, Version};
 use stabbur_jobs_core::{Capability, CapabilitySet};
@@ -821,7 +822,11 @@ fn catalog_entry_from_document(
     {
         return None;
     }
+    let filename = path.file_name()?.to_str()?;
+    let name = filename.split('.').next()?.to_owned();
+    let purpose = inventory::document_purpose(document);
     Some(RecipeCatalogEntry {
+        guidance: RecipeCatalogGuidance::new(name, purpose).ok(),
         import_sources: None,
         identifier,
         builder: "autopkg".to_owned(),

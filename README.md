@@ -62,7 +62,7 @@ not change the server API contract; see
 ## Management console and operator workflows
 
 The independent [`stabbur-frontend`](https://github.com/terjekv/stabbur-frontend) repository provides a self-hosted
-management console using server-held Stabbur login sessions. See [operator workflows](docs/operator-workflows.md)
+management console using server-held Stabbur login sessions. See [operator workflows](docs/operator-workflows.md) and [operator scale decisions](docs/architecture/operator-scale.md)
 for catalog plans, source-pin proposals, status views, draining, withdrawal, storage inspection and
 Munki export. The supported client, CLI and console pin the same 75-operation public contract.
 

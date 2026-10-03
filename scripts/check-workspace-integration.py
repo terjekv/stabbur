@@ -112,7 +112,7 @@ def run(args):
                 assert not json.loads(subprocess.check_output(command + ['catalog', 'plan', '--file', str(file)], env=cli_env, timeout=20))['actions']
                 status, _, reader = http(origin, '/api/v1/auth/principals', {'name': 'console-reader', 'kind': 'human', 'roles': ['reader'], 'password': password}, authorization)
                 require(status, 201, 'create reader')
-                frontend_env = {**env, 'STABBUR_FRONTEND_DEVELOPMENT': '1', 'STABBUR_SERVER_ORIGIN': origin, 'STABBUR_FRONTEND_ORIGIN': console, 'STABBUR_FRONTEND_BIND': console.removeprefix('http://')}
+                frontend_env = {**env, 'STABBUR_FRONTEND_DEVELOPMENT': '1', 'STABBUR_SERVER_ORIGIN': origin, 'STABBUR_FRONTEND_ORIGIN': console, 'STABBUR_FRONTEND_BIND': console.removeprefix('http://'), 'STABBUR_FRONTEND_DATA_DIR': str(work / 'delivery')}
                 web = subprocess.Popen([str(console_binary)], env=frontend_env, stdout=log, stderr=log)
                 processes.append(web)
                 ready(console, '/', web)
@@ -128,6 +128,17 @@ def run(args):
                 assert 'HttpOnly' in headers['set-cookie'] and 'SameSite=Strict' in headers['set-cookie']
                 assert authentication['token'] not in json.dumps(session)
                 csrf_headers = {'origin': console, 'x-csrf-token': session['csrf']}
+                require(http(console, '/api/delivery/profile', {'channel':'testing'}, {'origin':console}, browser)[0], 403, 'delivery profile requires CSRF')
+                require(http(console, '/api/delivery/profile', {'channel':'testing'}, {**csrf_headers,'origin':'https://untrusted.example'}, browser)[0], 403, 'delivery profile requires exact origin')
+                profile_status, profile_headers, profile_bytes = http(console, '/api/delivery/profile', {'channel':'testing'}, csrf_headers, browser)
+                require(profile_status, 200, 'administrator can download device profile')
+                require(profile_headers['content-disposition'].startswith('attachment;'), True, 'profile is a credential attachment')
+                import plistlib
+                profile = plistlib.loads(profile_bytes)
+                require(profile['PayloadScope'], 'System', 'profile is system-wide')
+                require(profile['PayloadContent'][0]['PayloadType'], 'ManagedInstalls', 'profile targets Munki preferences')
+                require(profile['PayloadContent'][0]['SoftwareRepoURL'], console + '/munki/testing', 'profile selects exact repository channel')
+                require(http(console, '/munki/testing/catalogs/testing')[0], 401, 'repository requires separate device credential')
                 require(http(console, '/api/operation/list_software', {}, {'origin': console}, browser)[0], 403, 'missing CSRF')
                 require(http(console, '/api/recipe-import', import_body, {'origin':console}, browser)[0], 403, 'import missing CSRF')
                 require(http(console, '/api/recipe-import', import_body, {**csrf_headers, 'origin':'https://untrusted.example'}, browser)[0], 403, 'foreign origin import')
@@ -145,12 +156,13 @@ def run(args):
                 status, _, session = http(console, '/api/login', {'username': 'console-reader', 'password': password}, login_headers, browser)
                 require(status, 200, 'reader login')
                 csrf_headers['x-csrf-token'] = session['csrf']
+                require(http(console, '/api/delivery/profile', {'channel':'testing'}, csrf_headers, browser)[0], 403, 'reader cannot issue repository profiles')
                 require(http(console, '/api/operation/create_software', {'body': {'slug': 'forbidden-create', 'name': 'Forbidden'}, 'idempotency_key': 'denied-create'}, csrf_headers, browser)[0], 403, 'upstream role enforcement')
                 require(http(origin, f"/api/v1/auth/principals/{reader['id']}/revoke-sessions", {}, authorization)[0], 200, 'revoke reader sessions')
                 require(http(console, '/api/session', opener=browser)[0], 401, 'upstream revocation')
                 print('PASS: three pinned contracts, independent client, CLI pagination/catalog v2, console login/origin/CSRF/roles/logout/revocation')
                 if args.browser:
-                    from e2e_browser import operator_workflows
+                    from e2e_browser import operator_workflows, saved_export_workflow, console_page, library_workflow
                     from console_fixture import publish_fixture
                     published_run = publish_fixture(origin, authorization, http)
                     snapshots = json.loads(subprocess.check_output(command + ['catalog', 'snapshots', '--all'], env=cli_env, timeout=20))
@@ -166,6 +178,61 @@ def run(args):
                     assert subprocess.run(import_command, env=cli_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20).returncode != 0
                     assert json.loads(imported_file.read_text()) == desired
                     operator_workflows(console, password, published_run)
+                    export_id,export_cookies=saved_export_workflow(console,password)
+                    with console_page(console,password) as reused:
+                        assert reused.context.cookies()==export_cookies, 'browser helpers must reuse the fixture session without another login'
+                    saved=json.loads(subprocess.check_output(command+['exports','show',export_id],env=cli_env,timeout=20))
+                    assert saved['definition']['name']=='Staff Macs' and saved['generation']==1
+                    export_plan=work/'export-plan.json'
+                    subprocess.run(command+['exports','plan',export_id,'--output',str(export_plan)],env=cli_env,check=True,stdout=subprocess.DEVNULL,timeout=20)
+                    preview=json.loads(export_plan.read_text());assert preview['ready'] and preview['changes'][0]['action']=='unchanged'
+                    subprocess.run(command+['--yes','exports','apply','--plan-file',str(export_plan)],env=cli_env,check=True,stdout=subprocess.DEVNULL,timeout=20)
+                    assert subprocess.run(command+['--yes','exports','apply','--plan-file',str(export_plan)],env=cli_env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20).returncode!=0
+                    download=work/'downloaded-export'
+                    subprocess.run(command+['exports','download',export_id,'--output',str(download)],env=cli_env,check=True,stdout=subprocess.DEVNULL,timeout=20)
+                    catalog=plistlib.loads((download/'repository/catalogs/production').read_bytes());assert len(catalog)==1
+                    import hashlib
+                    assert hashlib.sha256((download/'repository/pkgs'/catalog[0]['installer_item_location']).read_bytes()).hexdigest()==catalog[0]['installer_item_hash']
+                    assert not (download/'repository/manifests').exists()
+                    assert subprocess.run(command+['exports','download',export_id,'--output',str(download)],env=cli_env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20).returncode!=0
+                    # Reuse the authenticated browser session; do not defeat the login rate limit.
+                    from http.cookiejar import Cookie
+                    for cookie in export_cookies:
+                        jar.set_cookie(Cookie(0,cookie['name'],cookie['value'],None,False,cookie['domain'],False,False,cookie['path'],True,cookie['secure'],None,True,None,None,{}))
+                    status,_,session=http(console,'/api/session',opener=browser)
+                    require(status,200,'export administrator session')
+                    export_headers={'origin':console,'x-csrf-token':session['csrf']}
+                    profile_path='/api/exports/'+export_id+'/profile'
+                    require(http(console,profile_path,{'reviewed':True},{'origin':console},browser)[0],403,'saved profile requires CSRF')
+                    require(http(console,profile_path,{'reviewed':True},{**export_headers,'origin':'https://untrusted.example'},browser)[0],403,'saved profile requires exact origin')
+                    require(http(console,profile_path,{'reviewed':False},export_headers,browser)[0],400,'saved profile requires review')
+                    status,headers,body=http(console,profile_path,{'reviewed':True},export_headers,browser)
+                    require(status,200,'saved profile download')
+                    assert headers['content-disposition'].startswith('attachment;')
+                    preferences=plistlib.loads(body)['PayloadContent'][0]
+                    assert preferences['PayloadType']=='ManagedInstalls' and preferences['ClientIdentifier']=='site_default'
+                    repo_path='/munki/exports/'+export_id+'/catalogs/production'
+                    require(http(console,repo_path)[0],401,'anonymous saved repository denied')
+                    device_auth={'authorization':preferences['AdditionalHttpHeaders'][0].split(': ',1)[1]}
+                    status,_,body=http(console,repo_path,headers=device_auth)
+                    require(status,200,'saved repository device authentication')
+                    assert len(plistlib.loads(body))==1
+                    status,_,archive=http(console,'/api/exports/'+export_id+'/snapshots/2/download',opener=browser)
+                    require(status,200,'snapshot tar download')
+                    import io,tarfile
+                    with tarfile.open(fileobj=io.BytesIO(archive),mode='r:') as bundle:
+                        names=bundle.getnames();assert 'repository/catalogs/production' in names
+                        assert not any(name.startswith('repository/manifests') for name in names)
+                    subprocess.run(command+['--yes','exports','revoke-profiles',export_id],env=cli_env,check=True,stdout=subprocess.DEVNULL,timeout=20)
+                    require(http(console,repo_path,headers=device_auth)[0],401,'CLI revocation invalidates browser-issued device profile')
+                    print('PASS: browser saved selection and blocker preview; CLI reads, reviews, applies and downloads the same export; stale plans and existing destinations rejected')
+
+                    for index in range(240):
+                        require(http(origin, '/api/v1/software', {'slug':f'scale-{index:03}', 'name':f'Scale application {index:03}'}, authorization)[0], 201, 'seed scale library')
+                    result = json.loads(subprocess.check_output(command+['software','search','Scale application 239','--view','not_built'],env=cli_env,timeout=20))
+                    assert len(result['items'])==1 and result['items'][0]['slug']=='scale-239'
+                    library_workflow(console,password)
+                    print('PASS: 240-application search, no per-row status reads, selection across pages and queries, paginated export picker, shared views, CLI search, mobile layout')
                     print('PASS: console navigation, validation, catalog review, named builds, paginated logs, publication, stale promotion, expiry, literal text and mobile reflow')
                 if args.keep_running:
                     # Fixed public fixture credentials are printed only for interactive local QA; never a token.

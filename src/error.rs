@@ -44,6 +44,11 @@ pub struct ApiError {
 }
 
 impl ApiError {
+    /// Safe public problem details for composing bounded application diagnostics.
+    #[must_use]
+    pub fn problem(&self) -> &Problem {
+        &self.problem
+    }
     /// Associates an existing safe diagnostic with a request field without changing its code.
     #[must_use]
     pub fn with_field(mut self, field: &'static str) -> Self {

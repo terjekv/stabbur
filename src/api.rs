@@ -1,7 +1,11 @@
 //! Actix handlers and application services for the released `/api/v1` slice.
 
+mod exports;
+pub use exports::*;
 mod operations;
 pub use operations::*;
+mod library;
+pub use library::*;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -153,7 +157,19 @@ pub fn configure(configuration: &mut web::ServiceConfig) {
                 .service(revoke_api_token)
                 .service(list_roles)
                 .service(create_role)
+                .service(list_exports)
+                .service(create_export)
+                .service(get_export)
+                .service(update_export)
+                .service(plan_export)
+                .service(apply_export)
+                .service(get_export_snapshot)
+                .service(list_export_history)
+                .service(create_export_reader)
+                .service(revoke_export_readers)
+                .service(export_repository)
                 .service(list_software)
+                .service(software_library)
                 .service(create_software)
                 .service(get_software)
                 .service(update_software)
@@ -3219,6 +3235,9 @@ impl From<RecipeCatalogSource> for RecipeCatalogSourceResponse {
 /// Builder-neutral recipe observed in a pinned catalog.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct RecipeCatalogEntryResponse {
+    /// Observed display hints, never a safety or readiness guarantee. Absent in legacy snapshots.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    guidance: Option<RecipeCatalogGuidanceResponse>,
     /// Complete pinned source closure; absent when a recipe needs attention before import.
     #[serde(skip_serializing_if = "Option::is_none")]
     import_sources: Option<Vec<RecipeCatalogSourceResponse>>,
@@ -3232,9 +3251,51 @@ pub struct RecipeCatalogEntryResponse {
     required_capabilities: Vec<String>,
 }
 
+/// Bounded recipe display metadata observed by a worker.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct RecipeCatalogGuidanceResponse {
+    /// Display name derived from the recipe filename, never its input values.
+    name: String,
+    /// Observed processing intent across the parent chain.
+    purpose: RecipePurposeResponse,
+}
+
+/// Observed recipe intent; custom processors may have additional effects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RecipePurposeResponse {
+    /// Fetch a vendor artifact.
+    FetchArtifact,
+    /// Build or copy a package.
+    BuildArtifact,
+    /// Install on the worker.
+    Install,
+    /// Publish to another distribution system.
+    Publish,
+    /// Unknown intent.
+    Unknown,
+}
+
+impl From<stabbur_builder_core::RecipePurpose> for RecipePurposeResponse {
+    fn from(value: stabbur_builder_core::RecipePurpose) -> Self {
+        use stabbur_builder_core::RecipePurpose;
+        match value {
+            RecipePurpose::FetchArtifact => Self::FetchArtifact,
+            RecipePurpose::BuildArtifact => Self::BuildArtifact,
+            RecipePurpose::Install => Self::Install,
+            RecipePurpose::Publish => Self::Publish,
+            RecipePurpose::Unknown => Self::Unknown,
+        }
+    }
+}
+
 impl From<RecipeCatalogEntry> for RecipeCatalogEntryResponse {
     fn from(value: RecipeCatalogEntry) -> Self {
         Self {
+            guidance: value.guidance.map(|hint| RecipeCatalogGuidanceResponse {
+                name: hint.name().to_owned(),
+                purpose: hint.purpose().into(),
+            }),
             import_sources: value
                 .import_sources
                 .map(|sources| sources.as_slice().iter().cloned().map(Into::into).collect()),

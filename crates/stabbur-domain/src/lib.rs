@@ -1,5 +1,8 @@
 //! Runtime-neutral identities, entities, and policy for Stabbur.
 
+/// Saved export selection and immutable publication values.
+pub mod exports;
+
 use std::{cmp::Ordering, fmt, str::FromStr};
 
 use chrono::{DateTime, Utc};
@@ -119,6 +122,8 @@ macro_rules! typed_uuid {
 
 typed_uuid!(/// Identity of a software aggregate.
     SoftwareId, "software ID");
+typed_uuid!(/// Identity of a saved export.
+    ExportId, "export ID");
 typed_uuid!(/// Identity of a release.
     ReleaseId, "release ID");
 typed_uuid!(/// Identity of a release variant.
