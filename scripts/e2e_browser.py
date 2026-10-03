@@ -255,6 +255,13 @@ def operator_workflows(origin, password, published_run):
         imported_row = page.get_by_role('row').filter(has_text='console-imported-app')
         imported_row.wait_for()
         assert 'Disabled' in imported_row.inner_text()
+        imported_row.get_by_role('button').click()
+        page.get_by_role('button', name='Review and build', exact=True).click()
+        expect(dialog.get_by_role('checkbox')).to_be_visible()
+        expect(dialog).to_contain_text('console-fixture-worker')
+        expect(dialog).to_contain_text('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+        expect(dialog.get_by_role('button', name='Enable and start build', exact=True)).to_be_enabled()
+        page.get_by_role('button', name='Close', exact=True).click()
 
         page.goto(origin + '/#/runs/' + published_run)
         expect(page.get_by_role('link', name='Review resulting release', exact=True)).to_be_visible(timeout=20000)
