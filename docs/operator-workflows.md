@@ -154,7 +154,8 @@ stabbur exports profile staff-macs --output managed-macs.mobileconfig
 `exports save --file definition.json` creates a draft. Updating one also requires `--export NAME
 --revision N` from `exports show`. Apply and profile creation require confirmation (`--yes` for
 reviewed automation). Downloads create `new-export/repository` and never replace an existing
-path. The definition JSON format is shown in [the example](examples/munki-export.json).
+path. The definition JSON format is shown in [the example](examples/munki-export.json). Replace its
+software UUID with one from `stabbur software list`.
 
 The earlier console delivery screen remains under **Exports → Earlier Munki publications**, at
 its original repository URLs. Its local state is separate from saved server exports. For those

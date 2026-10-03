@@ -1010,7 +1010,7 @@ async fn provisioned_worker_claims_and_completes_a_typed_autopkg_run() {
             let response = test::call_service(&app, request).await;
             let status = response.status();
             let body: serde_json::Value = test::read_body_json(response).await;
-            assert_eq!(status, $status, "{body}");
+            assert_eq!(status, $status);
             body
         }};
     }

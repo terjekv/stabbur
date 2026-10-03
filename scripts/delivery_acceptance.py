@@ -231,7 +231,7 @@ def exercise_delivery(args, work, api, gateway, console, password, first_release
              'settings':{'format':'pkg','detection':detection}},
             {'software':app_software['id'],'source':{'kind':'channel','channel':'testing'},'architectures':[],
              'settings':{'format':'dmg_app','detection':{'kind':'application','name':app_name,'bundle_id':app_id}}}]}
-    saved=gateway.call('/api/operation/create_export',{'body':definition},expected=201)
+    saved=gateway.call('/api/operation/create_export',{'body':definition})
     parameters={'export':saved['id']}
     preview=gateway.call('/api/operation/plan_export',{'parameters':parameters})
     require(preview['ready'] and len(preview['items'])==2,'complete batch contains both selected installers')
