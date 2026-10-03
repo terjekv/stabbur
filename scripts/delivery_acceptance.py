@@ -88,12 +88,18 @@ def exercise_delivery(args, work, api, gateway, console, password, first_release
             file = work / ('preferences-' + name + '.plist')
             file.write_bytes(plistlib.dumps(config))
             file.chmod(0o600)
-            command(['sudo', '-n', '/usr/bin/install', '-m', '600', file, installed_preferences])
+            command(['sudo', '-n', '/usr/bin/defaults', 'import', installed_preferences.with_suffix(''), file])
+            command(['sudo', '-n', '/bin/chmod', '600', installed_preferences])
         try:
+            if args.install_fixture:
+                # Inspect privately: --show-config includes the repository credential.
+                effective = command(['sudo', '-n', args.munki_tools / 'managedsoftwareupdate', '--show-config'])
+                require(str(managed).encode() in effective, 'Munki reads the new managed install directory')
+                require(preferences['SoftwareRepoURL'].encode() in effective, 'Munki reads the downloaded repository settings')
             yield managed
         finally:
             if args.install_fixture:
-                command(['sudo', '-n', '/bin/rm', '-f', installed_preferences])
+                command(['sudo', '-n', '/usr/bin/defaults', 'delete', installed_preferences.with_suffix('')])
                 command(['sudo', '-n', '/usr/sbin/chown', '-R', str(os.getuid()), managed])
 
     def install_check(managed, software, verify):
@@ -164,7 +170,7 @@ def exercise_delivery(args, work, api, gateway, console, password, first_release
     finally:
         if args.install_fixture:
             command(['sudo', '-n', '/bin/rm', '-rf', destination])
-            command(['sudo', '-n', '/usr/sbin/pkgutil', '--forget', identifier])
+            subprocess.run(['sudo', '-n', '/usr/sbin/pkgutil', '--forget', identifier], capture_output=True, timeout=30)
 
     # A second actual AutoPkg build covers copy_from_dmg and application detection.
     unique = uuid.uuid4().hex

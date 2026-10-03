@@ -216,7 +216,7 @@ def munki_cycle(args, work, export, identifier, destination):
             'SoftwareRepoURL': origin, 'ClientIdentifier': 'stabbur-e2e',
             'InstallAppleSoftwareUpdates': False, 'SuppressAutoInstall': True,
             'LogFile': str(work / 'munki.log')}))
-        command(['sudo', '-n', '/usr/bin/install', '-m', '644', config, preferences])
+        command(['sudo', '-n', '/usr/bin/defaults', 'import', preferences.with_suffix(''), config])
         try:
             command(['sudo', '-n', tools / 'managedsoftwareupdate', '--checkonly', '--munkipkgsonly'])
             before = plistlib.loads((managed / 'InstallInfo.plist').read_bytes())
@@ -229,7 +229,7 @@ def munki_cycle(args, work, export, identifier, destination):
             after = plistlib.loads((managed / 'InstallInfo.plist').read_bytes())
             require(not after.get('managed_installs'), 'Munki detects installed fixture; no reinstall')
         finally:
-            command(['sudo', '-n', '/bin/rm', '-f', preferences])
+            command(['sudo', '-n', '/usr/bin/defaults', 'delete', preferences.with_suffix('')])
             # Only the unique, script-generated fixture path and receipt are removed.
             command(['sudo', '-n', '/bin/rm', '-rf', destination])
             subprocess.run(['sudo', '-n', '/usr/sbin/pkgutil', '--forget', identifier], capture_output=True, timeout=30)
