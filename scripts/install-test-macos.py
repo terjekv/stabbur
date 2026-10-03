@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 COMPANIONS = {
     'stabbur-client-rust': '9d088c263c843d6fc71524acba2cb31b075d5280',
     'stabbur-cli': '7e498ec5c9f3f6532404934cb06449b1712887e4',
-    'stabbur-frontend': '5ee7b0d3c53a0fedd94af02fb64911c8b5c31142',
+    'stabbur-frontend': '2bf42e29293da37b60048dc5aaa18ba3a8b865a1',
 }
 COMPONENTS = ('server', 'worker', 'frontend')
 SAFE_PATH = '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin'
@@ -227,6 +227,7 @@ class Installation:
             args = [self.prefix / 'libexec/stabbur-frontend']
             env.update(STABBUR_FRONTEND_DEVELOPMENT='1', STABBUR_SERVER_ORIGIN=self.api,
                        STABBUR_FRONTEND_ORIGIN=self.web,
+                       STABBUR_FRONTEND_DATA_DIR=str(self.prefix / 'delivery'),
                        STABBUR_FRONTEND_BIND=f'127.0.0.1:{self.web_port}')
         # env -i also clears launchd's ambient application, proxy and loader settings.
         return ['/usr/bin/env', '-i', *[f'{key}={value}' for key, value in env.items()],

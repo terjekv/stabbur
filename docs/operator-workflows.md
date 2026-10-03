@@ -15,7 +15,8 @@ The console logs in with the same Stabbur account as the CLI through its server-
 3. Add software and a reviewed recipe revision, or review and apply a catalog plan. Open the
    software page and choose **Add build target**. Select the software, recipe and exact revision.
    Start with a manual schedule. New console targets default to disabled.
-4. Review and enable the target, then select **Build now**. The console opens the run's progress,
+4. For a disabled manual target, choose **Review and build**, check its source pins and worker,
+   then **Enable and start build**. Existing enabled targets use **Build now**. The console opens the run's progress,
    replayed logs and verification result. The CLI equivalent is
    `stabbur target trigger NAME --idempotency-key UNIQUE_KEY --watch`.
 5. Follow **Review resulting release**. Check the exact version, verification evidence and
@@ -106,6 +107,20 @@ objects or historical records. Repeat bounded passes when necessary.
 
 ## Export to Munki
 
+The console now also offers **Munki delivery**. With its private delivery storage configured,
+promote a release to testing, open its software page and continue to Munki delivery. Review the
+installer format and installed-state detection, then publish. The console supplies a protected
+repository URL, catalogs, manifests and verified installer bytes. Download a configuration profile
+for a test Mac with Munki installed; the application-specific profile requests that application's
+installation. Use Managed Software Center to install and check again. Confirm both checks before
+publishing to stable. A local loopback installation is reachable only from that same Mac.
+
+The console records reviewed publication snapshots separately from control-plane channels.
+Console withdrawal also removes its served copies; external API/CLI withdrawal requires explicit
+removal in Munki delivery. Already downloaded copies cannot be recalled. For repository deployment
+and credential rotation, see the independent frontend README. The CLI workflow below remains
+available for existing repositories.
+
 `stabbur munki-export <software> --channel stable --platform macos --architecture arm64
 --macos 15.0 --extension pkg --pkginfo-template reviewed-pkginfo.json --output export` resolves one
 promoted installer, verifies a local SHA-256 download, and produces `pkgs/` and `pkgsinfo/` in a new
@@ -143,7 +158,7 @@ and installation remain covered by the separate macOS acceptance workflow.
 
 ## Discover and import AutoPkg recipes
 
-Open **Add software from recipes**. Choose an inventory, or use **Firefox starter source** and scan
+Open **Add software from recipes**. Choose an inventory, or use **Use reviewed starter recipes** and scan
 its displayed exact commit. Scan progress refreshes automatically. The picker groups recipes by
 software and shows Recommended, Artifact recipes, Needs setup, and All discovered views. Purpose is
 observed from known processors across the parent chain; it is neither a suffix guess nor an execution
@@ -151,7 +166,8 @@ safety guarantee. Install and publish workflows are excluded from guided artifac
 
 Configure each selected installer separately. Confirm architecture from the artifact, not the worker,
 and supply its version and installer output variables. The exact pinned FirefoxSignedPkg preset
-suggests `version` and `pathname`; other recipes require reviewed mappings. Old snapshots without
+suggests `version` and `pathname`; Thunderbird and VLC have additional reviewed presets at that
+same source pin. Other recipes require reviewed mappings. Old snapshots without
 purpose metadata remain readable but must be rescanned for guided import. Parent trust requirements,
 missing dependencies and incomplete source closures prevent guided import in both UI and client.
 

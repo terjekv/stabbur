@@ -51,6 +51,30 @@ def login(page, password):
     expect(page.get_by_role('navigation', name='Management')).to_be_visible()
 
 
+def publish_delivery(origin, password, software, version, detection, kind, channel, tested):
+    with console_page(origin, password) as page:
+        page.goto(origin + '/#/delivery/' + software)
+        page.get_by_role('button', name=re.compile('^Publish .* to ' + channel + '$')).click()
+        dialog = page.get_by_role('dialog')
+        expect(dialog.get_by_role('heading', name=re.compile(re.escape(version) + ' → ' + channel))).to_be_visible()
+        dialog.get_by_label('Test Mac macOS version', exact=True).fill('15.0')
+        dialog.get_by_label('Installer format', exact=True).select_option(kind)
+        dialog.get_by_label('Detect installed software using', exact=True).select_option(detection['kind'])
+        if detection['kind'] == 'receipt':
+            dialog.get_by_label('Package identifier', exact=True).fill(detection['package_id'])
+        else:
+            dialog.get_by_label('Application filename', exact=True).fill(detection['name'])
+            dialog.get_by_label('Bundle identifier', exact=True).fill(detection['bundle_id'])
+        if tested:
+            dialog.get_by_role('checkbox', name='I verified installation and confirmed that a second update check does not offer this version again.', exact=True).check()
+        dialog.get_by_role('checkbox', name='I reviewed this exact release, installer format, architecture and detection settings.', exact=True).check()
+        dialog.get_by_role('button', name='Publish to ' + channel, exact=True).click()
+        expect(dialog).not_to_be_visible(timeout=60000)
+        expect(page.get_by_role('heading', name='Published versions', exact=True)).to_be_visible()
+        page.set_viewport_size({'width':320,'height':800})
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'Munki delivery overflows at 320px'
+
+
 def start_build(origin, password, manifest):
     with console_page(origin, password) as page:
         page.get_by_role('link', name='Catalog plans', exact=True).click()
@@ -65,9 +89,9 @@ def start_build(origin, password, manifest):
         dialog.get_by_role('button', name='Close', exact=True).click()
         page.get_by_role('link', name='Build targets', exact=True).click()
         page.get_by_role('button', name='delivery-build', exact=True).click()
-        page.get_by_role('button', name='Build now', exact=True).click()
+        page.get_by_role('button', name='Review and build', exact=True).click()
         dialog.get_by_role('checkbox').check()
-        dialog.get_by_role('button', name='Start build', exact=True).click()
+        dialog.get_by_role('button', name='Enable and start build', exact=True).click()
         expect(page).to_have_url(re.compile(r'/#/runs/[0-9a-f-]+$'))
         run_id = page.url.rsplit('/', 1)[-1]
         page.get_by_role('button', name='Sign out', exact=True).click()
@@ -81,7 +105,7 @@ def start_build(origin, password, manifest):
         return run_id
 
 
-def promote_release(origin, password, run_id, release_id):
+def promote_release(origin, password, run_id, release_id, channel='stable'):
     with console_page(origin, password) as page:
         page.goto(origin + '/#/runs/' + run_id)
         expect(page.locator('pre.logs')).not_to_be_empty()
@@ -89,12 +113,12 @@ def promote_release(origin, password, run_id, release_id):
         expect(page).to_have_url(re.compile(r'/#/releases/' + release_id + '$'))
         page.get_by_role('button', name='Promote release', exact=True).click()
         dialog = page.get_by_role('dialog')
-        dialog.get_by_label('Channel *', exact=True).select_option('stable')
+        dialog.get_by_label('Channel *', exact=True).select_option(channel)
         expect(dialog.get_by_label('Variant', exact=True)).to_be_enabled()
         dialog.get_by_role('checkbox').check()
         dialog.get_by_role('button', name='Promote release', exact=True).click()
         expect(page.get_by_role('heading', name='Delivery and builds', exact=True)).to_be_visible()
-        expect(page.locator('main')).to_contain_text('stable:')
+        expect(page.locator('main')).to_contain_text(channel + ':')
 
 
 def withdraw_release(origin, password, release_id):
@@ -206,9 +230,9 @@ def operator_workflows(origin, password, published_run):
         page.goto(origin + '/#/recipes')
         page.get_by_role('button', name='Add software from recipes', exact=True).click()
         page.get_by_role('heading', name='Add software', exact=True).wait_for()
-        ready = page.locator('.recipe-choice').filter(has_text='example.download.ImportedApp').get_by_role('checkbox')
+        ready = page.get_by_role('checkbox', name='Select example.download.ImportedApp', exact=True)
         ready.wait_for()
-        assert page.locator('.recipe-choice').filter(has_text='example.override.Uncommitted').get_by_role('checkbox').is_disabled()
+        assert page.get_by_role('checkbox', name='Select example.override.Uncommitted', exact=True).is_disabled()
         ready.check()
         page.set_viewport_size({'width':320,'height':800})
         assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'recipe import overflows at 320px'

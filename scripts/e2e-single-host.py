@@ -151,20 +151,20 @@ def fileserver(directory):
         thread.join(timeout=5)
 
 
-def fixture(work, feed_origin):
-    identifier = 'dev.stabbur.e2e.' + uuid.uuid4().hex
+def fixture(work, feed_origin, version='1.0', identifier=None):
+    identifier = identifier or 'dev.stabbur.e2e.' + uuid.uuid4().hex
     destination = '/private/var/tmp/' + identifier
     payload = work / 'payload'
-    payload.mkdir()
-    (payload / 'proof.txt').write_bytes(PAYLOAD)
-    package = work / 'public/fixture.pkg'
+    payload.mkdir(exist_ok=True)
+    (payload / 'proof.txt').write_bytes(f'Stabbur disposable delivery fixture {version}\n'.encode())
+    package = work / f'public/fixture-{version}.pkg'
     command(['/usr/bin/pkgbuild', '--root', payload, '--identifier', identifier,
-             '--version', '1.0', '--install-location', destination, package])
+             '--version', version, '--install-location', destination, package])
     (work / 'public/appcast.xml').write_text(
         '<?xml version="1.0"?><rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">'
-        '<channel><title>Stabbur CI</title><item><title>1.0</title>'
-        f'<enclosure url="{feed_origin}/fixture.pkg" sparkle:version="1.0" '
-        f'sparkle:shortVersionString="1.0" length="{package.stat().st_size}" '
+        f'<channel><title>Stabbur CI</title><item><title>{version}</title>'
+        f'<enclosure url="{feed_origin}/{package.name}" sparkle:version="{version}" '
+        f'sparkle:shortVersionString="{version}" length="{package.stat().st_size}" '
         'type="application/octet-stream"/></item></channel></rss>')
     definition = {
         'sources': [{'url': 'https://github.com/autopkg/recipes.git', 'commit': RECIPE_COMMIT}],
@@ -184,7 +184,7 @@ def fixture(work, feed_origin):
         'recipes': [{'name': 'delivery-recipe', 'revision': {'builder': 'autopkg',
                      'definition': definition, 'required_capabilities': []}}],
         'targets': [{'name': 'delivery-build', 'software': 'delivery-fixture',
-                     'recipe': 'delivery-recipe', 'parameters': {}, 'schedule': {'kind': 'manual'}, 'enabled': True}]}
+                     'recipe': 'delivery-recipe', 'parameters': {}, 'schedule': {'kind': 'manual'}, 'enabled': False}]}
     (work / 'catalog.json').write_text(json.dumps(manifest))
     metadata = {'installs': [{'type': 'file', 'path': destination + '/proof.txt',
                              'md5checksum': hashlib.md5(PAYLOAD, usedforsecurity=False).hexdigest()}],
@@ -298,6 +298,7 @@ def run(args, work, evidence):
                        '--data-dir', work / 'worker', '--autopkg-program', args.autopkg]
         worker = processes.start('worker', worker_args, env)
         frontend_env = {**env, 'STABBUR_FRONTEND_DEVELOPMENT': '1', 'STABBUR_SERVER_ORIGIN': origin,
+            'STABBUR_FRONTEND_DATA_DIR': str(work / 'delivery'),
             'STABBUR_FRONTEND_ORIGIN': console, 'STABBUR_FRONTEND_BIND': console.removeprefix('http://')}
         web = processes.start('frontend', [args.frontend], frontend_env)
         gateway = Http(console, {'origin': console, 'x-stabbur-login': '1'})
@@ -324,6 +325,9 @@ def run(args, work, evidence):
                 plan = gateway.call('/api/catalog/plan', {'manifest': manifest})
                 require(len(plan['actions']) == 4, 'reviewed plan includes software, recipe, revision, target')
                 gateway.call('/api/catalog/apply', {'manifest': manifest, 'plan': plan})
+                target = api.call('/api/v1/build-targets/delivery-build')
+                gateway.call('/api/operation/update_build_target', {'parameters': {'target': target['id']},
+                    'revision': target['revision'], 'body': {'enabled': True}})
                 run_id = gateway.call('/api/operation/trigger_build_target', {
                     'parameters': {'target': 'delivery-build'}, 'idempotency_key': 'delivery-first'})['id']
                 evidence['browser'] = 'not requested; authenticated BFF exercised'
@@ -364,6 +368,12 @@ def run(args, work, evidence):
             evidence['munki'] = munki_cycle(args, work, export, identifier, destination)
             evidence['delivery'] = {'version': release['version'], 'sha256': digest,
                                     'recipe_commit': RECIPE_COMMIT, 'logs_present': True}
+
+            from delivery_acceptance import exercise_delivery
+            evidence['managed_delivery'] = exercise_delivery(
+                args, work, api, gateway, console, PASSWORD, release, identifier, destination,
+                lambda: fixture(work, feed_origin, '2.0', identifier), feed_origin)
+            channel = api.call('/api/v1/software/delivery-fixture/channels/stable')
 
             # A stopped consistent backup includes DB, CAS and identity state. Restore elsewhere.
             evidence['stage'] = 'backup-restore'

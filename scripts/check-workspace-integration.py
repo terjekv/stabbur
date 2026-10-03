@@ -112,7 +112,7 @@ def run(args):
                 assert not json.loads(subprocess.check_output(command + ['catalog', 'plan', '--file', str(file)], env=cli_env, timeout=20))['actions']
                 status, _, reader = http(origin, '/api/v1/auth/principals', {'name': 'console-reader', 'kind': 'human', 'roles': ['reader'], 'password': password}, authorization)
                 require(status, 201, 'create reader')
-                frontend_env = {**env, 'STABBUR_FRONTEND_DEVELOPMENT': '1', 'STABBUR_SERVER_ORIGIN': origin, 'STABBUR_FRONTEND_ORIGIN': console, 'STABBUR_FRONTEND_BIND': console.removeprefix('http://')}
+                frontend_env = {**env, 'STABBUR_FRONTEND_DEVELOPMENT': '1', 'STABBUR_SERVER_ORIGIN': origin, 'STABBUR_FRONTEND_ORIGIN': console, 'STABBUR_FRONTEND_BIND': console.removeprefix('http://'), 'STABBUR_FRONTEND_DATA_DIR': str(work / 'delivery')}
                 web = subprocess.Popen([str(console_binary)], env=frontend_env, stdout=log, stderr=log)
                 processes.append(web)
                 ready(console, '/', web)
@@ -128,6 +128,9 @@ def run(args):
                 assert 'HttpOnly' in headers['set-cookie'] and 'SameSite=Strict' in headers['set-cookie']
                 assert authentication['token'] not in json.dumps(session)
                 csrf_headers = {'origin': console, 'x-csrf-token': session['csrf']}
+                require(http(console, '/api/delivery/profile', {'channel':'testing'}, {'origin':console}, browser)[0], 403, 'delivery profile requires CSRF')
+                require(http(console, '/api/delivery/profile', {'channel':'testing'}, {**csrf_headers,'origin':'https://untrusted.example'}, browser)[0], 403, 'delivery profile requires exact origin')
+                require(http(console, '/munki/testing/catalogs/testing')[0], 401, 'repository requires separate device credential')
                 require(http(console, '/api/operation/list_software', {}, {'origin': console}, browser)[0], 403, 'missing CSRF')
                 require(http(console, '/api/recipe-import', import_body, {'origin':console}, browser)[0], 403, 'import missing CSRF')
                 require(http(console, '/api/recipe-import', import_body, {**csrf_headers, 'origin':'https://untrusted.example'}, browser)[0], 403, 'foreign origin import')
@@ -145,6 +148,7 @@ def run(args):
                 status, _, session = http(console, '/api/login', {'username': 'console-reader', 'password': password}, login_headers, browser)
                 require(status, 200, 'reader login')
                 csrf_headers['x-csrf-token'] = session['csrf']
+                require(http(console, '/api/delivery/profile', {'channel':'testing'}, csrf_headers, browser)[0], 403, 'reader cannot issue repository profiles')
                 require(http(console, '/api/operation/create_software', {'body': {'slug': 'forbidden-create', 'name': 'Forbidden'}, 'idempotency_key': 'denied-create'}, csrf_headers, browser)[0], 403, 'upstream role enforcement')
                 require(http(origin, f"/api/v1/auth/principals/{reader['id']}/revoke-sessions", {}, authorization)[0], 200, 'revoke reader sessions')
                 require(http(console, '/api/session', opener=browser)[0], 401, 'upstream revocation')

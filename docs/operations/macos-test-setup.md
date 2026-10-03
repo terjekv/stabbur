@@ -152,7 +152,11 @@ uses `sudo` and may prompt for your macOS password. It installs AutoPkg system-w
 to replace an existing AutoPkg directory or package receipt. Stopping or removing the test setup
 does not uninstall AutoPkg. The default installer command never installs system packages.
 
-Munki is optional delivery tooling and is not installed or configured by this script. The CLI's
+The console's protected Munki repository is configured in private installation storage. Open
+**Munki delivery** after promoting a release to testing. Its loopback URL serves only this Mac;
+a separate test device requires a reachable HTTPS deployment of the console.
+
+Munki client tooling is optional and is not installed or configured by this script. The CLI's
 `munki-export` can export approved artifacts into a directory you select. For a disposable test
 that installs and detects a real package with Munki, use the separate
 [single-host E2E harness](single-host-e2e.md); its system-changing fixture is intended for a
